@@ -1,0 +1,32 @@
+export const ErrorCode = Object.freeze({
+  INVALID_CONFIGURATION: 'INVALID_CONFIGURATION',
+  INVALID_PROGRAM: 'INVALID_PROGRAM',
+  PROGRAM_NOT_READY: 'PROGRAM_NOT_READY',
+  PROGRAM_NOT_RESIDENT: 'PROGRAM_NOT_RESIDENT',
+  PROGRAM_TOO_LARGE: 'PROGRAM_TOO_LARGE',
+  NO_FREE_PARTITION: 'NO_FREE_PARTITION',
+  INSUFFICIENT_TOTAL_MEMORY: 'INSUFFICIENT_TOTAL_MEMORY',
+  EXTERNAL_FRAGMENTATION: 'EXTERNAL_FRAGMENTATION',
+  COMPACTION_NOT_ALLOWED: 'COMPACTION_NOT_ALLOWED',
+  COMPACTION_NOT_NEEDED: 'COMPACTION_NOT_NEEDED',
+  ADDRESS_OUT_OF_RANGE: 'ADDRESS_OUT_OF_RANGE',
+  STATE_INVARIANT_FAILED: 'STATE_INVARIANT_FAILED',
+  UNSUPPORTED_SCHEMA: 'UNSUPPORTED_SCHEMA',
+  UNSAFE_INTEGER: 'UNSAFE_INTEGER',
+  INVALID_SIZE: 'INVALID_SIZE',
+  NOT_FOUND: 'NOT_FOUND'
+});
+
+export class DomainError extends Error {
+  /**
+   * @param {string} code
+   * @param {string} [message]
+   * @param {Record<string, unknown>} [details]
+   */
+  constructor(code, message, details = {}) {
+    super(message || code);
+    this.name = 'DomainError';
+    this.code = code;
+    this.details = details;
+  }
+}

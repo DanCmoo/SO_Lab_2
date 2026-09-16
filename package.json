@@ -1,0 +1,9 @@
+{
+  "name": "multiprogrammed-memory-simulator",
+  "version": "1.0.0",
+  "description": "Educational contiguous memory allocation simulator for multiprogrammed systems",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  }
+}

@@ -1,0 +1,50 @@
+:root {
+  /* Warm cream palette */
+  --color-bg: #F4EEDF;
+  --color-surface: #FFF9ED;
+  --color-surface-strong: #EDE2CE;
+  --color-text: #2F2A24;
+  --color-muted: #746A5D;
+  --color-border: #CFC0A8;
+  --color-primary: #725A3A;
+  --color-primary-hover: #5F492F;
+  --color-free: #E7DDCB;
+  --color-os: #4B4339;
+  --color-danger: #9B3E32;
+  --color-danger-hover: #7D2D23;
+  --color-success: #486B4B;
+  --color-internal-frag: #E8D4BE;
+
+  /* Process semantic palette */
+  --color-prog-1: #4D6B50;
+  --color-prog-1-bg: #E3ECE4;
+  --color-prog-2: #9B4F3A;
+  --color-prog-2-bg: #F7EAE6;
+  --color-prog-3: #967026;
+  --color-prog-3-bg: #F7F0E1;
+  --color-prog-4: #3E6478;
+  --color-prog-4-bg: #E1ECF2;
+  --color-prog-5: #734A6A;
+  --color-prog-5-bg: #EFE6EE;
+
+  /* Geometry & Shadows */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --shadow-card: 0 1px 4px rgba(47, 42, 36, 0.08), 0 1px 1px rgba(47, 42, 36, 0.04);
+  --shadow-modal: 0 8px 30px rgba(47, 42, 36, 0.18);
+
+  /* Typography */
+  --font-ui: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+
+  /* Spacing Scale */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+}
