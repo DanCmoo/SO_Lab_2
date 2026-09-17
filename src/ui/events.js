@@ -68,7 +68,7 @@ export function initEvents(store) {
         openModal(elements.dialogConfirmReset);
       } catch (error) {
         elements.selectMode.value = state.config.mode;
-        alert(`Configuration error: ${error.message}`);
+        alert(`Error de configuración: ${error.message}`);
       }
       return;
     }
@@ -103,7 +103,7 @@ export function initEvents(store) {
         message: 'Configuración aplicada al mapa de memoria física.'
       });
     } catch (e) {
-      alert(`Configuration error: ${e.message}`);
+      alert(`Error de configuración: ${e.message}`);
     }
   });
 
@@ -121,7 +121,7 @@ export function initEvents(store) {
         alert(res.details?.error || res.code);
       }
     } catch (e) {
-      alert(`Cannot start simulation: ${e.message}`);
+      alert(`No se puede iniciar la simulación: ${e.message}`);
     }
   });
 
@@ -170,7 +170,7 @@ export function initEvents(store) {
       setStatusBanner({ type: 'success', message: 'Escenario importado correctamente.' });
       announce('Escenario importado correctamente.');
     } else {
-      alert(`Import error: ${res.details?.error || res.code}`);
+      alert(`Error de importación: ${res.details?.error || res.code}`);
     }
   });
 
@@ -210,7 +210,7 @@ export function initEvents(store) {
     try {
       const draft = getCustomProgramDraft();
       if (!draft.name) {
-        alert('Please enter a valid program name.');
+        alert('Introduce un nombre válido para el programa.');
         return;
       }
       const res = store.dispatch({ type: 'CREATE_PROGRAM', payload: draft });
@@ -222,10 +222,10 @@ export function initEvents(store) {
         });
         announce(`Programa ${draft.name} creado`);
       } else {
-        alert(`Cannot create program: ${res.details?.error || res.code}`);
+        alert(`No se puede crear el programa: ${res.details?.error || res.code}`);
       }
     } catch (e) {
-      alert(`Error creating program: ${e.message}`);
+      alert(`Error al crear el programa: ${e.message}`);
     }
   });
 
@@ -262,12 +262,12 @@ export function initEvents(store) {
                   });
                   announce(`Memoria compactada y programa ${progId} asignado`);
                 } else {
-                  alert(`Retry failed: ${retryRes.details?.error || retryRes.code}`);
+                  alert(`Error al reintentar: ${retryRes.details?.error || retryRes.code}`);
                 }
               }
             }
           });
-          announce(`External fragmentation for program ${progId}`);
+          announce(`Fragmentación externa para el programa ${progId}`);
         } else {
           setStatusBanner({
             type: 'error',
@@ -290,7 +290,7 @@ export function initEvents(store) {
         });
         announce(`Programa ${progId} terminado`);
       } else {
-        alert(`Cannot terminate: ${res.details?.error || res.code}`);
+        alert(`No se puede terminar: ${res.details?.error || res.code}`);
       }
     }
   });
@@ -299,7 +299,7 @@ export function initEvents(store) {
   elements.btnToggleTable.addEventListener('click', () => {
     const isHidden = elements.accessibleMemoryTableWrap.style.display === 'none';
     elements.accessibleMemoryTableWrap.style.display = isHidden ? 'block' : 'none';
-    elements.btnToggleTable.textContent = isHidden ? 'Hide Table' : 'View as Table';
+    elements.btnToggleTable.textContent = isHidden ? 'Ocultar tabla' : 'Ver como tabla';
     elements.btnToggleTable.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
   });
 
