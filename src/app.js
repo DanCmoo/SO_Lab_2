@@ -10,13 +10,13 @@ import { openModal, closeModal } from './ui/dialogs.js';
 import { elements } from './ui/elements.js';
 
 /**
- * Initializes and starts the Multiprogrammed Memory Simulator application.
+ * Inicializa y ejecuta la aplicación del simulador de memoria multiprogramada.
  */
 function init() {
   const savedState = loadFromStorage();
 
   if (savedState) {
-    // Offer Resume simulation or Start over
+    // Ofrece reanudar la simulación o comenzar de nuevo.
     openModal(elements.dialogResume);
 
     elements.btnResumeConfirm.onclick = () => {
@@ -43,16 +43,16 @@ function init() {
 function bootstrapApp(initialState) {
   const store = createStore(initialState, reduceCommand);
 
-  // Subscribe renderer to state mutations
+  // Suscribe el renderizador a los cambios de estado.
   store.subscribe(state => {
     renderApp(state, store);
   });
 
-  // Bind delegated UI events & accessibility shortcuts
+  // Registra los eventos delegados de la interfaz y los accesos directos.
   initEvents(store);
   initKeyboardShortcuts(store);
 
-  // Initial render
+  // Renderizado inicial.
   renderApp(store.getState(), store);
 }
 

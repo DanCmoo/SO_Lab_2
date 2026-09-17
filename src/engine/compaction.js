@@ -8,7 +8,7 @@ import { DomainError, ErrorCode } from '../domain/errors.js';
 import { createMemoryBlock } from '../domain/models.js';
 
 /**
- * Lays out program segments contiguously inside [program.start, program.end].
+ * Organiza los segmentos del programa de forma contigua dentro de [program.start, program.end].
  *
  * @param {import('../domain/constants.js').Program} program
  * @returns {Array<import('../domain/constants.js').Segment & { start: number, end: number }>}
@@ -28,9 +28,9 @@ export function layoutSegments(program) {
 }
 
 /**
- * Checks if memory can be compacted.
- * Returns true if mode is DYNAMIC_COMPACTION and there is at least one process that can be moved
- * or multiple separated holes.
+ * Comprueba si se puede compactar la memoria.
+ * Devuelve true si el modo es DYNAMIC_COMPACTION y hay al menos un proceso que se pueda mover
+ * o varios huecos separados.
  *
  * @param {import('../domain/constants.js').SimulationState} state
  * @returns {{ canCompact: boolean, reason?: string }}
@@ -45,7 +45,7 @@ export function canCompactMemory(state) {
     return { canCompact: false, reason: 'No free memory holes to compact' };
   }
 
-  // If there's only 1 hole and it's already at the very end of memory
+  // Si solo hay un hueco y ya está al final de la memoria.
   if (holes.length === 1 && holes[0].end === MAX_ADDRESS) {
     return { canCompact: false, reason: 'Memory is already fully compacted' };
   }
@@ -54,9 +54,9 @@ export function canCompactMemory(state) {
 }
 
 /**
- * Performs memory compaction on dynamic memory.
- * Shifts resident processes toward the OS boundary in ascending physical order,
- * updates program and segment addresses, and creates one single residual hole at the high-address end.
+ * Realiza la compactación de la memoria dinámica.
+ * Desplaza los procesos residentes hacia el límite del sistema operativo en orden físico ascendente,
+ * actualiza las direcciones del programa y sus segmentos, y crea un único hueco residual al final.
  *
  * @param {import('../domain/constants.js').SimulationState} state
  * @returns {{

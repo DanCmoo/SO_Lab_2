@@ -14,7 +14,7 @@ import { endAddress } from './address.js';
 import { DomainError, ErrorCode } from './errors.js';
 
 /**
- * Creates a validated segment.
+ * Crea un segmento validado.
  * @param {Object} params
  * @param {string} params.id
  * @param {string} params.name
@@ -40,7 +40,7 @@ export function createSegment({ id, name, sizeBytes }) {
 }
 
 /**
- * Creates a validated program.
+ * Crea un programa validado.
  * @param {Object} params
  * @param {string} params.id
  * @param {string} params.name
@@ -106,7 +106,7 @@ export function createProgram({
 }
 
 /**
- * Creates a static partition object.
+ * Crea un objeto de partición estática.
  * @param {Object} params
  * @param {string} params.id
  * @param {number} params.start
@@ -126,7 +126,7 @@ export function createPartition({ id, start, sizeBytes, programId = null }) {
 }
 
 /**
- * Creates a unified memory block (OS, PARTITION, PROCESS, HOLE).
+ * Crea un bloque de memoria unificado (sistema operativo, partición, proceso o hueco).
  * @param {Object} params
  * @param {string} params.id
  * @param {string} params.kind
@@ -151,7 +151,7 @@ export function createMemoryBlock({ id, kind, start, sizeBytes, programId = null
 }
 
 /**
- * Creates a validated simulation config.
+ * Crea una configuración de simulación validada.
  * @param {Partial<import('./constants.js').SimulationConfig>} [overrides]
  * @returns {import('./constants.js').SimulationConfig}
  */
@@ -219,7 +219,7 @@ export function createSimulationConfig(overrides = {}) {
 }
 
 /**
- * Creates the initial simulation state.
+ * Crea el estado inicial de la simulación.
  * @param {Partial<import('./constants.js').SimulationConfig>} [configOverrides]
  * @param {import('./constants.js').Program[]} [initialPrograms]
  * @returns {import('./constants.js').SimulationState}
@@ -283,7 +283,7 @@ export function createInitialState(configOverrides = {}, initialPrograms = []) {
       cursor = p.end + 1;
     });
   } else {
-    // Dynamic modes: single initial hole covering all user memory if userBytes > 0
+    // Modos dinámicos: un único hueco inicial que cubre toda la memoria de usuario si hay espacio.
     const userBytes = config.totalBytes - config.osBytes;
     if (userBytes > 0) {
       blocks.push(
@@ -298,7 +298,7 @@ export function createInitialState(configOverrides = {}, initialPrograms = []) {
     }
   }
 
-  // Prepend OS block
+  // Añade el bloque del sistema operativo al principio.
   blocks.unshift(osBlock);
 
   return Object.freeze({
@@ -308,7 +308,6 @@ export function createInitialState(configOverrides = {}, initialPrograms = []) {
     programs: Object.freeze([...initialPrograms]),
     partitions: Object.freeze(partitions),
     blocks: Object.freeze(blocks),
-    history: Object.freeze([]),
     nextSequence: 1,
     selectedId: null,
     lastTrace: null

@@ -3,12 +3,12 @@ import { allocate } from './simulator.js';
 import { deriveMetrics } from '../domain/metrics.js';
 
 /**
- * Runs an isolated comparison across First Fit, Best Fit, and Worst Fit algorithms
- * on independent clones of the base state with the given program queue order.
- * Never mutates the base state.
+ * Ejecuta una comparación aislada entre primer, mejor y peor ajuste
+ * sobre copias independientes del estado base y con el orden indicado de la cola.
+ * Nunca modifica el estado base.
  *
  * @param {import('../domain/constants.js').SimulationState} baseState
- * @param {string[]} [programIds] Optional specific program IDs to attempt in order
+ * @param {string[]} [programIds] IDs opcionales de programas que se intentarán en orden
  * @returns {Array<{
  *   algorithm: string,
  *   allocatedCount: number,
@@ -28,7 +28,7 @@ export function compareAlgorithms(baseState, programIds) {
     AllocationAlgorithm.WORST_FIT
   ];
 
-  // If no programIds provided, default to all ready programs in arrival order
+  // Si no se proporcionan IDs, usa todos los programas listos en orden de llegada.
   const targetIds =
     programIds ||
     baseState.programs
@@ -39,7 +39,7 @@ export function compareAlgorithms(baseState, programIds) {
   const results = [];
 
   for (const algo of algorithms) {
-    // Deep clone the base state
+    // Clona completamente el estado base.
     let clone = JSON.parse(JSON.stringify(baseState));
     clone.config.algorithm = algo;
 

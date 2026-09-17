@@ -1,13 +1,13 @@
 import { elements } from './elements.js';
 
 /**
- * Announces a message to screen readers via aria-live.
+ * Anuncia un mensaje a los lectores de pantalla mediante aria-live.
  * @param {string} message
  */
 export function announce(message) {
   if (elements.liveAnnouncer) {
     elements.liveAnnouncer.textContent = '';
-    // Short timeout to ensure screen reader detects the text change
+    // Breve espera para asegurar que el lector de pantalla detecte el cambio.
     setTimeout(() => {
       elements.liveAnnouncer.textContent = message;
     }, 50);
@@ -15,12 +15,12 @@ export function announce(message) {
 }
 
 /**
- * Initializes global keyboard shortcuts (e.g. Ctrl+Z for Undo).
+ * Inicializa los accesos directos globales (por ejemplo, Ctrl+Z para deshacer).
  * @param {import('../state/store.js').createStore} store
  */
 export function initKeyboardShortcuts(store) {
   window.addEventListener('keydown', e => {
-    // Ignore inside textareas or input typing
+    // Ignora la combinación al escribir en campos de entrada o áreas de texto.
     if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) {
       return;
     }

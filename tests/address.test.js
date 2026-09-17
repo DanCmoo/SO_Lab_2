@@ -12,16 +12,16 @@ test('Address: 24-bit physical boundaries and total size', () => {
 });
 
 test('Address: endAddress calculation', () => {
-  // 1 MiB block starting at 0
+  // Bloque de 1 MiB que comienza en 0.
   assert.equal(endAddress(0, 1 * MIB), 0x0FFFFF);
 
-  // Next block starting at 1 MiB
+  // Siguiente bloque que comienza en 1 MiB.
   assert.equal(endAddress(0x100000, 3 * MIB), 0x3FFFFF);
 
-  // Full 16 MiB block starting at 0
+  // Bloque completo de 16 MiB que comienza en 0.
   assert.equal(endAddress(0, 16 * MIB), 0xFFFFFF);
 
-  // Errors on invalid sizes or addresses
+  // Errores para tamaños o direcciones no válidos.
   assert.throws(() => endAddress(0, 0), { code: ErrorCode.INVALID_SIZE });
   assert.throws(() => endAddress(0, -10), { code: ErrorCode.INVALID_SIZE });
   assert.throws(() => endAddress(-1, 100), { code: ErrorCode.ADDRESS_OUT_OF_RANGE });

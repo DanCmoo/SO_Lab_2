@@ -3,7 +3,7 @@ import { DomainError, ErrorCode } from '../domain/errors.js';
 import { extractCandidates } from './candidates.js';
 
 /**
- * Allocates a program into the lowest-address free static partition of equal size.
+ * Asigna un programa en la partición estática libre de igual tamaño y menor dirección.
  *
  * @param {import('../domain/constants.js').SimulationState} state
  * @param {string} programId
@@ -23,7 +23,7 @@ export function allocateStaticEqual(state, programId) {
     throw new DomainError(ErrorCode.PROGRAM_NOT_READY, `Program ${programId} is not in ready status (current: ${program.status})`);
   }
 
-  // Check if any partition in the system could ever contain this program
+  // Comprueba si alguna partición puede contener este programa.
   const maxPartitionCapacity = Math.max(0, ...state.partitions.map(p => p.sizeBytes));
   if (program.sizeBytes > maxPartitionCapacity) {
     throw new DomainError(
@@ -37,7 +37,7 @@ export function allocateStaticEqual(state, programId) {
     throw new DomainError(ErrorCode.NO_FREE_PARTITION, 'All static partitions are currently occupied');
   }
 
-  // Find lowest address partition that can contain the program
+  // Busca la partición de menor dirección que pueda contener el programa.
   const suitable = freePartitions.find(p => p.capacityBytes >= program.sizeBytes);
   if (!suitable) {
     throw new DomainError(ErrorCode.NO_FREE_PARTITION, 'No free partition is large enough for the program');
@@ -105,7 +105,7 @@ export function allocateStaticEqual(state, programId) {
 }
 
 /**
- * Terminates an allocated static program and frees its partition.
+ * Termina un programa estático asignado y libera su partición.
  *
  * @param {import('../domain/constants.js').SimulationState} state
  * @param {string} programId

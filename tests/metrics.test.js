@@ -35,6 +35,6 @@ test('Metrics: static allocation updates resident bytes, internal fragmentation,
   assert.equal(metrics.internalFragmentationBytes, 1 * MIB);
   assert.equal(metrics.freeBytes, 12 * MIB); // 4 remaining 3 MiB partitions
   assert.equal(metrics.freeBlockCount, 4);
-  // Utilization = 2 / 15 * 100 = 13.33%
+  // Utilización = 2 / 15 * 100 = 13,33 %.
   assert.equal(metrics.utilizationPercent, 13.33);
 });

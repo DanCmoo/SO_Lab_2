@@ -1,46 +1,13 @@
 import { MAX_UNDO_DEPTH } from '../domain/constants.js';
 
 /**
- * Creates an immutable history entry.
- *
- * @param {Object} params
- * @param {number} params.sequence
- * @param {string} params.commandType
- * @param {string} params.outcomeCode
- * @param {string} params.mode
- * @param {string|null} [params.algorithm]
- * @param {Record<string, unknown>} [params.details={}]
- * @returns {import('../domain/constants.js').HistoryEntry}
- */
-export function createHistoryEntry({
-  sequence,
-  commandType,
-  outcomeCode,
-  mode,
-  algorithm = null,
-  details = {}
-}) {
-  return Object.freeze({
-    sequence,
-    commandType,
-    outcomeCode,
-    mode,
-    algorithm,
-    timestamp: new Date().toISOString(),
-    details: Object.freeze({ ...details })
-  });
-}
-
-/**
- * History and Snapshot Undo Stack Manager.
+ * Gestor de la pila de instantáneas para deshacer.
  */
 export class HistoryManager {
   constructor(maxDepth = MAX_UNDO_DEPTH) {
     this.maxDepth = maxDepth;
     /** @type {Array<import('../domain/constants.js').SimulationState>} */
     this.undoStack = [];
-    /** @type {Array<import('../domain/constants.js').HistoryEntry>} */
-    this.historyEntries = [];
   }
 
   /**
@@ -48,7 +15,7 @@ export class HistoryManager {
    * @param {import('../domain/constants.js').SimulationState} state
    */
   pushSnapshot(state) {
-    // Structured clone snapshot of state
+    // Crea una copia estructurada del estado.
     const snapshot = JSON.parse(JSON.stringify(state));
     this.undoStack.push(snapshot);
     if (this.undoStack.length > this.maxDepth) {
@@ -73,18 +40,9 @@ export class HistoryManager {
   }
 
   /**
-   * Records an immutable history entry.
-   * @param {import('../domain/constants.js').HistoryEntry} entry
-   */
-  recordEntry(entry) {
-    this.historyEntries.push(entry);
-  }
-
-  /**
-   * Clears the undo stack and history entries.
+   * Vacía la pila de deshacer.
    */
   clear() {
     this.undoStack = [];
-    this.historyEntries = [];
   }
 }

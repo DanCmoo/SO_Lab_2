@@ -6,7 +6,7 @@ import { allocate, terminate, compact } from '../engine/simulator.js';
 import { importScenario } from './persistence.js';
 
 /**
- * Pure command reducer applying a command to the simulation state.
+ * Reductor puro que aplica un comando al estado de la simulación.
  *
  * @param {import('../domain/constants.js').SimulationState} state
  * @param {Object} command

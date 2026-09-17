@@ -1,8 +1,8 @@
 /**
- * Cached DOM element references.
+ * Referencias almacenadas de los elementos del DOM.
  */
 export const elements = {
-  // Selectors & Controls
+  // Selectores y controles.
   selectMode: document.getElementById('select-mode'),
   selectAlgorithm: document.getElementById('select-algorithm'),
   btnStartSim: document.getElementById('btn-start-sim'),
@@ -13,7 +13,7 @@ export const elements = {
   btnImportScenario: document.getElementById('btn-import-scenario'),
   btnReset: document.getElementById('btn-reset'),
 
-  // Config panel
+  // Panel de configuración.
   badgeSimPhase: document.getElementById('badge-sim-phase'),
   formConfig: document.getElementById('form-config'),
   inputOsSize: document.getElementById('input-os-size'),
@@ -51,9 +51,8 @@ export const elements = {
   metricResidentCount: document.getElementById('metric-resident-count'),
   metricProbes: document.getElementById('metric-probes'),
 
-  // Inspector & History
+  // Inspector
   inspectorContent: document.getElementById('inspector-content'),
-  historyFeed: document.getElementById('history-feed'),
 
   // Dialogs
   dialogNewProgram: document.getElementById('dialog-new-program'),

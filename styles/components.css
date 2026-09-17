@@ -376,38 +376,6 @@
   font-family: var(--font-mono);
 }
 
-/* History Log */
-.history-feed {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  max-height: 280px;
-  overflow-y: auto;
-}
-
-.history-item {
-  padding: var(--space-2);
-  border-left: 3px solid var(--color-primary);
-  background: var(--color-surface);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-  font-size: 0.8rem;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.history-item-top {
-  display: flex;
-  justify-content: space-between;
-  font-weight: 600;
-}
-
-.history-item-time {
-  color: var(--color-muted);
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-}
-
 /* Modal Dialogs */
 dialog {
   border: 1px solid var(--color-border);

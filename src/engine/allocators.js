@@ -19,8 +19,8 @@ import { AllocationAlgorithm } from '../domain/constants.js';
  */
 
 /**
- * Selects an allocation candidate according to First Fit, Best Fit, or Worst Fit policies.
- * Candidates MUST be sorted in ascending start-address order.
+ * Selecciona un candidato según las políticas de primer, mejor o peor ajuste.
+ * Los candidatos DEBEN estar ordenados por dirección inicial ascendente.
  *
  * @param {Array<{id: string, start: number, capacityBytes: number, type: 'partition'|'hole'}>} candidates
  * @param {number} requestBytes
@@ -80,7 +80,7 @@ export function selectCandidate(candidates, requestBytes, algorithm = Allocation
     };
   }
 
-  // Best Fit and Worst Fit require inspecting all candidates
+  // El mejor y el peor ajuste requieren inspeccionar todos los candidatos.
   let chosen = null;
   const isBestFit = algorithm === AllocationAlgorithm.BEST_FIT;
 
@@ -98,7 +98,7 @@ export function selectCandidate(candidates, requestBytes, algorithm = Allocation
       if (!chosen) {
         chosen = candidate;
       } else if (isBestFit) {
-        // Smallest capacity, tie-break lowest start
+        // Menor capacidad; en caso de empate, menor dirección inicial.
         if (
           candidate.capacityBytes < chosen.capacityBytes ||
           (candidate.capacityBytes === chosen.capacityBytes && candidate.start < chosen.start)
@@ -106,7 +106,7 @@ export function selectCandidate(candidates, requestBytes, algorithm = Allocation
           chosen = candidate;
         }
       } else {
-        // Worst Fit: Largest capacity, tie-break lowest start
+        // Peor ajuste: mayor capacidad; en caso de empate, menor dirección inicial.
         if (
           candidate.capacityBytes > chosen.capacityBytes ||
           (candidate.capacityBytes === chosen.capacityBytes && candidate.start < chosen.start)

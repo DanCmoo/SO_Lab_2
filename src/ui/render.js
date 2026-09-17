@@ -7,16 +7,22 @@ import { updateConfigFormVisibility } from './forms.js';
 import { elements } from './elements.js';
 
 /**
- * Main rendering coordinator projecting SimulationState into the DOM.
+ * Coordinador principal que proyecta el estado de la simulación en el DOM.
  *
  * @param {import('../domain/constants.js').SimulationState} state
  * @param {Object} store
  */
 export function renderApp(state, store) {
-  const { config, phase, programs, blocks, history, selectedId } = state;
+  const { config, phase, programs, blocks, selectedId } = state;
   const isRunning = phase === 'RUNNING';
+  const statusLabels = {
+    ready: 'Listo',
+    allocated: 'Asignado',
+    terminated: 'Terminado',
+    rejected: 'Rechazado'
+  };
 
-  // 1. Synchronize Top Bar Controls
+  // 1. Sincroniza los controles de la barra superior.
   if (elements.selectMode.value !== config.mode) {
     elements.selectMode.value = config.mode;
   }
@@ -27,24 +33,24 @@ export function renderApp(state, store) {
   elements.btnUndo.disabled = !store.canUndo();
 
   if (isRunning) {
-    elements.btnStartSim.textContent = 'Running';
+    elements.btnStartSim.textContent = 'En ejecución';
     elements.btnStartSim.disabled = true;
-    elements.badgeSimPhase.textContent = 'Running';
+    elements.badgeSimPhase.textContent = 'En ejecución';
     elements.badgeSimPhase.className = 'badge badge-allocated';
   } else {
-    elements.btnStartSim.textContent = 'Start simulation';
+    elements.btnStartSim.textContent = 'Iniciar simulación';
     elements.btnStartSim.disabled = false;
-    elements.badgeSimPhase.textContent = 'Configuring';
+    elements.badgeSimPhase.textContent = 'Configurando';
     elements.badgeSimPhase.className = 'badge badge-ready';
   }
 
   const compactCheck = canCompactMemory(state);
   elements.btnCompactTop.disabled = !compactCheck.canCompact;
 
-  // 2. Configuration Form State
+  // 2. Actualiza el estado del formulario de configuración.
   updateConfigFormVisibility(state);
 
-  // 3. Render Ready Queue
+  // 3. Renderiza la cola de procesos.
   const queueFragment = document.createDocumentFragment();
   for (const prog of programs) {
     const item = document.createElement('div');
@@ -61,19 +67,19 @@ export function renderApp(state, store) {
 
     let actionBtnHtml = '';
     if (prog.status === ProgramStatus.READY) {
-      actionBtnHtml = `<button class="btn-sm btn-primary btn-allocate" data-id="${prog.id}" type="button">Allocate</button>`;
+      actionBtnHtml = `<button class="btn-sm btn-primary btn-allocate" data-id="${prog.id}" type="button">Asignar</button>`;
     } else if (prog.status === ProgramStatus.ALLOCATED) {
-      actionBtnHtml = `<button class="btn-sm btn-danger btn-terminate" data-id="${prog.id}" type="button">Terminate</button>`;
+      actionBtnHtml = `<button class="btn-sm btn-danger btn-terminate" data-id="${prog.id}" type="button">Terminar</button>`;
     }
 
     item.innerHTML = `
       <div class="queue-item-info">
         <div class="queue-item-title">
           <span>${prog.name}</span>
-          <span class="badge ${statusBadgeClass}">${prog.status}</span>
+          <span class="badge ${statusBadgeClass}">${statusLabels[prog.status] || prog.status}</span>
         </div>
         <div class="queue-item-sub">
-          <strong>${formatBytes(prog.sizeBytes)}</strong> &bull; ${prog.segments.length} segments (${segmentSummary})
+          <strong>${formatBytes(prog.sizeBytes)}</strong> &bull; ${prog.segments.length} segmentos (${segmentSummary})
         </div>
         ${
           prog.status === ProgramStatus.ALLOCATED && prog.start !== null
@@ -92,12 +98,12 @@ export function renderApp(state, store) {
   elements.queueList.innerHTML = '';
   elements.queueList.appendChild(queueFragment);
 
-  // 4. Render Memory Map Visualizer
+  // 4. Renderiza el mapa visualizador de memoria.
   renderMemoryMap(state, blockId => {
     store.dispatch({ type: 'SELECT_BLOCK', id: blockId });
   });
 
-  // 5. Render Continuous Metrics Grid
+  // 5. Renderiza la cuadrícula de métricas.
   const metrics = deriveMetrics(state);
   elements.metricAllocated.textContent = formatBytes(metrics.allocatedProgramBytes);
   elements.metricFree.textContent = formatBytes(metrics.freeBytes);
@@ -108,7 +114,7 @@ export function renderApp(state, store) {
   elements.metricResidentCount.textContent = `${metrics.residentProgramCount}`;
   elements.metricProbes.textContent = `${metrics.lastProbeCount}`;
 
-  // 6. Render Selected Block Inspector
+  // 6. Renderiza el inspector del bloque seleccionado.
   if (selectedId) {
     const block = blocks.find(b => b.id === selectedId);
     if (block) {
@@ -129,7 +135,7 @@ export function renderApp(state, store) {
         const segs = layoutSegments(residentProg);
         segmentsHtml = `
           <div style="margin-top: 8px;">
-            <strong>Internal Segments:</strong>
+            <strong>Segmentos internos:</strong>
             <ul style="list-style: none; margin-top: 4px; display: flex; flex-direction: column; gap: 4px;">
               ${segs
                 .map(
@@ -148,19 +154,19 @@ export function renderApp(state, store) {
 
       elements.inspectorContent.innerHTML = `
         <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem;">
-          <div><strong>Block ID:</strong> <span class="font-mono">${block.id}</span></div>
-          <div><strong>Block Type:</strong> <span class="badge badge-ready">${block.kind}</span></div>
-          <div><strong>Start Address:</strong> <span class="font-mono">${toHexAddress(block.start)}</span></div>
-          <div><strong>End Address:</strong> <span class="font-mono">${toHexAddress(block.end)}</span></div>
-          <div><strong>Capacity / Size:</strong> <span class="font-mono">${formatBytes(block.sizeBytes)}</span></div>
+          <div><strong>ID del bloque:</strong> <span class="font-mono">${block.id}</span></div>
+          <div><strong>Tipo de bloque:</strong> <span class="badge badge-ready">${block.kind}</span></div>
+          <div><strong>Dirección inicial:</strong> <span class="font-mono">${toHexAddress(block.start)}</span></div>
+          <div><strong>Dirección final:</strong> <span class="font-mono">${toHexAddress(block.end)}</span></div>
+          <div><strong>Capacidad / tamaño:</strong> <span class="font-mono">${formatBytes(block.sizeBytes)}</span></div>
           ${
             residentProg
-              ? `<div><strong>Assigned Program:</strong> ${residentProg.name} (${residentProg.id})</div>`
+              ? `<div><strong>Programa asignado:</strong> ${residentProg.name} (${residentProg.id})</div>`
               : ''
           }
           ${
             internalFrag > 0
-              ? `<div><strong>Internal Fragmentation:</strong> <span class="font-mono" style="color: #7A4B24;">${formatBytes(internalFrag)}</span></div>`
+              ? `<div><strong>Fragmentación interna:</strong> <span class="font-mono" style="color: #7A4B24;">${formatBytes(internalFrag)}</span></div>`
               : ''
           }
           ${segmentsHtml}
@@ -169,49 +175,14 @@ export function renderApp(state, store) {
     }
   } else {
     elements.inspectorContent.innerHTML = `
-      <p class="text-muted" style="font-size: 0.85rem;">Click any memory block on the map to inspect physical addresses, resident processes, and internal segments.</p>
+      <p class="text-muted" style="font-size: 0.85rem;">Haz clic en un bloque de memoria para consultar direcciones físicas, procesos residentes y segmentos internos.</p>
     `;
   }
 
-  // 7. Render Event History Log
-  const historyFragment = document.createDocumentFragment();
-  const entries = [...(history || [])].reverse();
-
-  for (const entry of entries) {
-    const item = document.createElement('div');
-    item.className = 'history-item';
-
-    const date = new Date(entry.timestamp);
-    const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
-    let detailsText = '';
-    if (entry.details?.programId) {
-      detailsText += `Program: ${entry.details.programId} `;
-    }
-    if (entry.details?.internalFragmentationBytes) {
-      detailsText += `(Internal Frag: ${formatBytes(entry.details.internalFragmentationBytes)}) `;
-    }
-    if (entry.details?.bytesMoved) {
-      detailsText += `(Relocated: ${formatBytes(entry.details.bytesMoved)}) `;
-    }
-
-    item.innerHTML = `
-      <div class="history-item-top">
-        <span>#${entry.sequence} &bull; ${entry.commandType}</span>
-        <span class="history-item-time">${timeStr}</span>
-      </div>
-      <div>${detailsText || entry.outcomeCode}</div>
-    `;
-
-    historyFragment.appendChild(item);
-  }
-
-  elements.historyFeed.innerHTML = '';
-  elements.historyFeed.appendChild(historyFragment);
 }
 
 /**
- * Updates the top status alert banner with message, outcome, and optional action buttons.
+ * Actualiza el aviso de estado superior con el mensaje, el resultado y botones opcionales.
  *
  * @param {Object} params
  * @param {'success'|'warning'|'error'} params.type

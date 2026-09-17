@@ -7,7 +7,7 @@ import { terminateStatic } from './static-equal.js';
 export { terminateStatic };
 
 /**
- * Allocates a program into static unequal partitions using the active allocation algorithm.
+ * Asigna un programa en particiones estáticas desiguales usando el algoritmo activo.
  *
  * @param {import('../domain/constants.js').SimulationState} state
  * @param {string} programId

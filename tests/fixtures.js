@@ -1,7 +1,7 @@
 import { MIB } from '../src/domain/constants.js';
 
 /**
- * Required allocator fixture from technical-spec §25.2
+ * Dispositivo de prueba requerido para asignadores según la especificación técnica §25.2.
  */
 export const ALLOCATOR_FIXTURE = Object.freeze({
   holes: Object.freeze([
@@ -13,7 +13,7 @@ export const ALLOCATOR_FIXTURE = Object.freeze({
 });
 
 /**
- * Tie-breaking fixture with equal sizes at different addresses
+ * Dispositivo de prueba para desempates con tamaños iguales en direcciones distintas.
  */
 export const TIE_BREAK_FIXTURE = Object.freeze({
   candidates: Object.freeze([

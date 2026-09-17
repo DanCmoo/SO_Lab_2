@@ -5,7 +5,7 @@ import { selectCandidate } from './allocators.js';
 import { createMemoryBlock } from '../domain/models.js';
 
 /**
- * Classifies the reason for a dynamic allocation failure.
+ * Clasifica el motivo de un fallo de asignación dinámica.
  *
  * @param {import('../domain/constants.js').SimulationState} state
  * @param {number} requestBytes
@@ -26,7 +26,7 @@ export function classifyDynamicFailure(state, requestBytes) {
 }
 
 /**
- * Splits a chosen hole into a PROCESS block and an optional residual HOLE.
+ * Divide un hueco seleccionado en un bloque PROCESS y un HOLE residual opcional.
  *
  * @param {import('../domain/constants.js').MemoryBlock} hole
  * @param {import('../domain/constants.js').Program} program
@@ -58,7 +58,7 @@ export function allocateIntoHole(hole, program) {
 }
 
 /**
- * Normalizes memory blocks by coalescing adjacent free holes in a single pass.
+ * Normaliza los bloques de memoria fusionando los huecos libres adyacentes en una sola pasada.
  *
  * @param {import('../domain/constants.js').MemoryBlock[]} blocks
  * @returns {import('../domain/constants.js').MemoryBlock[]}
@@ -85,7 +85,7 @@ export function coalesce(blocks) {
 }
 
 /**
- * Allocates a program in dynamic partition mode.
+ * Asigna un programa en modo de particiones dinámicas.
  *
  * @param {import('../domain/constants.js').SimulationState} state
  * @param {string} programId
@@ -156,7 +156,7 @@ export function allocateDynamic(state, programId, algorithmOverride) {
 }
 
 /**
- * Terminates an allocated program in dynamic partition mode and coalesces adjacent holes.
+ * Termina un programa asignado en modo dinámico y fusiona los huecos adyacentes.
  *
  * @param {import('../domain/constants.js').SimulationState} state
  * @param {string} programId

@@ -1,7 +1,7 @@
 import { BlockKind, MemoryMode, ProgramStatus, TOTAL_MEMORY_BYTES } from './constants.js';
 
 /**
- * Pure function deriving simulation metrics from a SimulationState.
+ * Función pura que calcula las métricas de simulación a partir de un estado.
  *
  * @param {import('./constants.js').SimulationState} state
  * @returns {{
@@ -77,16 +77,6 @@ export function deriveMetrics(state) {
 
   const lastProbeCount = state.lastTrace ? state.lastTrace.probes : 0;
 
-  // Retrieve last compaction bytes moved from the latest compaction history event if any
-  let lastCompactionBytesMoved = 0;
-  if (Array.isArray(state.history)) {
-    const compactionEntry = state.history.findLast?.(h => h.commandType === 'COMPACT_MEMORY' || h.commandType === 'COMPACT_AND_RETRY') ||
-      [...state.history].reverse().find(h => h.commandType === 'COMPACT_MEMORY' || h.commandType === 'COMPACT_AND_RETRY');
-    if (compactionEntry?.details?.bytesMoved) {
-      lastCompactionBytesMoved = Number(compactionEntry.details.bytesMoved) || 0;
-    }
-  }
-
   return {
     totalMemoryBytes,
     osBytes,
@@ -100,6 +90,6 @@ export function deriveMetrics(state) {
     residentProgramCount,
     utilizationPercent,
     lastProbeCount,
-    lastCompactionBytesMoved
+    lastCompactionBytesMoved: 0
   };
 }

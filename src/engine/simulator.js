@@ -5,7 +5,7 @@ import { allocateDynamic, terminateDynamic } from './dynamic.js';
 import { compactMemory } from './compaction.js';
 
 /**
- * Unified facade to allocate a program across any memory-management mode.
+ * Fachada unificada para asignar un programa en cualquier modo de gestión de memoria.
  *
  * @param {import('../domain/constants.js').SimulationState} state
  * @param {string} programId
@@ -28,12 +28,12 @@ export function allocate(state, programId, algorithmOverride) {
     return allocateStaticUnequal(state, programId, algorithmOverride);
   }
 
-  // DYNAMIC_NO_COMPACTION or DYNAMIC_COMPACTION
+  // DYNAMIC_NO_COMPACTION o DYNAMIC_COMPACTION.
   return allocateDynamic(state, programId, algorithmOverride);
 }
 
 /**
- * Unified facade to terminate a resident program across any memory mode.
+ * Fachada unificada para terminar un programa residente en cualquier modo de memoria.
  *
  * @param {import('../domain/constants.js').SimulationState} state
  * @param {string} programId
@@ -50,7 +50,7 @@ export function terminate(state, programId) {
 }
 
 /**
- * Unified facade to perform memory compaction.
+ * Fachada unificada para realizar la compactación de memoria.
  *
  * @param {import('../domain/constants.js').SimulationState} state
  * @returns {{

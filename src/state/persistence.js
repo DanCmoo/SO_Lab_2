@@ -3,7 +3,7 @@ import { DomainError, ErrorCode } from '../domain/errors.js';
 import { assertState } from '../domain/invariants.js';
 
 /**
- * Persists the simulation state to localStorage under the key 'mms:simulation:v1'.
+ * Persiste el estado de la simulación en localStorage con la clave 'mms:simulation:v1'.
  *
  * @param {import('../domain/constants.js').SimulationState} state
  * @returns {boolean}
@@ -17,13 +17,13 @@ export function saveToStorage(state) {
     window.localStorage.setItem(STORAGE_KEY, payload);
     return true;
   } catch (_e) {
-    // Quota exceeded or storage disabled
+    // Cuota excedida o almacenamiento deshabilitado.
     return false;
   }
 }
 
 /**
- * Loads and validates persisted simulation state from localStorage.
+ * Carga y valida el estado persistido de la simulación desde localStorage.
  *
  * @returns {import('../domain/constants.js').SimulationState|null}
  */
@@ -47,7 +47,7 @@ export function loadFromStorage() {
 }
 
 /**
- * Clears persisted state from localStorage.
+ * Elimina el estado persistido de localStorage.
  */
 export function clearStorage() {
   if (typeof window !== 'undefined' && window.localStorage) {
@@ -56,7 +56,7 @@ export function clearStorage() {
 }
 
 /**
- * Exports current simulation state and scenario as a JSON formatted string.
+ * Exporta el estado y el escenario actuales como una cadena JSON con formato.
  *
  * @param {import('../domain/constants.js').SimulationState} state
  * @returns {string}
@@ -73,7 +73,7 @@ export function exportScenario(state) {
 }
 
 /**
- * Parses and validates an imported scenario JSON string.
+ * Analiza y valida una cadena JSON de escenario importada.
  *
  * @param {string} jsonString
  * @returns {import('../domain/constants.js').SimulationState}

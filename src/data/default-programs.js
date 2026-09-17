@@ -4,7 +4,7 @@ import { createProgram } from '../domain/models.js';
 export const DEFAULT_PROGRAM_DEFS = Object.freeze([
   {
     id: 'P1',
-    name: 'Compiler',
+    name: 'Compilador',
     colorToken: 'var(--color-prog-1)',
     segments: [
       { id: 'P1-CODE', name: 'Code', sizeBytes: 768 * KIB },
@@ -15,7 +15,7 @@ export const DEFAULT_PROGRAM_DEFS = Object.freeze([
   },
   {
     id: 'P2',
-    name: 'Browser',
+    name: 'Navegador',
     colorToken: 'var(--color-prog-2)',
     segments: [
       { id: 'P2-CODE', name: 'Code', sizeBytes: 1 * MIB },
@@ -37,7 +37,7 @@ export const DEFAULT_PROGRAM_DEFS = Object.freeze([
   },
   {
     id: 'P4',
-    name: 'Database',
+    name: 'Base de datos',
     colorToken: 'var(--color-prog-4)',
     segments: [
       { id: 'P4-CODE', name: 'Code', sizeBytes: 1 * MIB },
@@ -48,7 +48,7 @@ export const DEFAULT_PROGRAM_DEFS = Object.freeze([
   },
   {
     id: 'P5',
-    name: 'Media Player',
+    name: 'Reproductor multimedia',
     colorToken: 'var(--color-prog-5)',
     segments: [
       { id: 'P5-CODE', name: 'Code', sizeBytes: 768 * KIB },

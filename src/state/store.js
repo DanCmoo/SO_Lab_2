@@ -1,9 +1,9 @@
 import { assertState } from '../domain/invariants.js';
-import { HistoryManager, createHistoryEntry } from './history.js';
+import { HistoryManager } from './history.js';
 import { saveToStorage } from './persistence.js';
 
 /**
- * Creates the central simulation store.
+ * Crea el almacén central de la simulación.
  *
  * @param {import('../domain/constants.js').SimulationState} initialState
  * @param {Function} reducer
@@ -12,7 +12,6 @@ import { saveToStorage } from './persistence.js';
  *   dispatch: (command: Object) => { ok: boolean, state: import('../domain/constants.js').SimulationState, code: string, details?: Record<string, unknown> },
  *   subscribe: (listener: (state: import('../domain/constants.js').SimulationState, result: Object) => void) => () => void,
  *   canUndo: () => boolean,
- *   getHistory: () => import('../domain/constants.js').HistoryEntry[]
  * }}
  */
 export function createStore(initialState, reducer) {
@@ -24,8 +23,6 @@ export function createStore(initialState, reducer) {
     getState: () => state,
 
     canUndo: () => historyManager.canUndo(),
-
-    getHistory: () => historyManager.historyEntries,
 
     dispatch(command) {
       if (command.type === 'UNDO') {
@@ -42,23 +39,13 @@ export function createStore(initialState, reducer) {
         assertState(priorState);
         state = priorState;
 
-        const undoEntry = createHistoryEntry({
-          sequence: state.nextSequence,
-          commandType: 'UNDO',
-          outcomeCode: 'UNDO_EXECUTED',
-          mode: state.config.mode,
-          algorithm: state.config.algorithm,
-          details: { restoredToSequence: priorState.nextSequence }
-        });
-        historyManager.recordEntry(undoEntry);
-
         saveToStorage(state);
         const result = { ok: true, state, code: 'UNDO_EXECUTED', details: {} };
         listeners.forEach(fn => fn(state, result));
         return result;
       }
 
-      // State-mutating commands: snapshot state before executing
+      // Comandos que modifican el estado: guarda una instantánea antes de ejecutarlos.
       const nonMutating = command.type === 'SELECT_BLOCK';
       if (!nonMutating) {
         historyManager.pushSnapshot(state);
@@ -70,26 +57,16 @@ export function createStore(initialState, reducer) {
         assertState(result.state);
 
         const currentSeq = state.nextSequence;
-        const entry = createHistoryEntry({
-          sequence: currentSeq,
-          commandType: command.type,
-          outcomeCode: result.code,
-          mode: result.state.config.mode,
-          algorithm: result.state.config.algorithm,
-          details: result.details || {}
-        });
-        historyManager.recordEntry(entry);
 
         state = {
           ...result.state,
-          history: Object.freeze([...(result.state.history || []), entry]),
           nextSequence: currentSeq + 1
         };
 
         saveToStorage(state);
         listeners.forEach(fn => fn(state, result));
       } else if (!nonMutating) {
-        // Discard the saved snapshot if command failed
+        // Descarta la instantánea guardada si el comando falla.
         historyManager.popSnapshot();
       }
 

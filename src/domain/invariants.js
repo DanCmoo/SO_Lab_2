@@ -9,8 +9,8 @@ import {
 import { DomainError, ErrorCode } from './errors.js';
 
 /**
- * Asserts all global and mode-specific invariants on a SimulationState.
- * Throws DomainError(STATE_INVARIANT_FAILED) if any invariant is violated.
+ * Comprueba todas las invariantes globales y específicas del modo de un estado.
+ * Lanza DomainError(STATE_INVARIANT_FAILED) si se infringe alguna invariante.
  * @param {import('./constants.js').SimulationState} state
  */
 export function assertState(state) {
@@ -20,7 +20,7 @@ export function assertState(state) {
 
   const { config, programs, partitions, blocks } = state;
 
-  // 1. Config invariants
+  // 1. Invariantes de configuración.
   if (config.totalBytes !== TOTAL_MEMORY_BYTES) {
     throw new DomainError(
       ErrorCode.STATE_INVARIANT_FAILED,
@@ -31,7 +31,7 @@ export function assertState(state) {
     throw new DomainError(ErrorCode.STATE_INVARIANT_FAILED, 'Invalid OS bytes configuration');
   }
 
-  // 2. Memory block continuous coverage invariants
+  // 2. Invariantes de cobertura continua de los bloques de memoria.
   if (!Array.isArray(blocks) || blocks.length === 0) {
     throw new DomainError(ErrorCode.STATE_INVARIANT_FAILED, 'Memory blocks array cannot be empty');
   }
@@ -86,13 +86,13 @@ export function assertState(state) {
     );
   }
 
-  // OS block invariant
+  // Invariante del bloque del sistema operativo.
   const osBlock = blocks[0];
   if (osBlock.kind !== BlockKind.OS || osBlock.start !== 0 || osBlock.sizeBytes !== config.osBytes) {
     throw new DomainError(ErrorCode.STATE_INVARIANT_FAILED, 'OS block must be first with configured OS size');
   }
 
-  // 3. Program invariants
+  // 3. Invariantes de los programas.
   const allocatedPrograms = new Set();
   for (const prog of programs) {
     const segmentSum = prog.segments.reduce((acc, s) => acc + s.sizeBytes, 0);
@@ -125,9 +125,9 @@ export function assertState(state) {
     }
   }
 
-  // 4. Mode-specific invariants
+  // 4. Invariantes específicas del modo.
   if (config.mode === MemoryMode.STATIC_EQUAL || config.mode === MemoryMode.STATIC_UNEQUAL) {
-    // Each partition contains at most one program
+    // Cada partición contiene como máximo un programa.
     const seenPrograms = new Set();
     for (const part of partitions) {
       if (part.programId) {
@@ -161,7 +161,7 @@ export function assertState(state) {
       }
     }
 
-    // Every allocated program must correspond to an occupied partition
+    // Cada programa asignado debe corresponder a una partición ocupada.
     for (const progId of allocatedPrograms) {
       if (!seenPrograms.has(progId)) {
         throw new DomainError(
@@ -171,8 +171,8 @@ export function assertState(state) {
       }
     }
   } else {
-    // Dynamic modes
-    // Check no adjacent holes
+    // Modos dinámicos.
+    // Comprueba que no haya huecos adyacentes.
     for (let i = 0; i < blocks.length - 1; i++) {
       if (blocks[i].kind === BlockKind.HOLE && blocks[i + 1].kind === BlockKind.HOLE) {
         throw new DomainError(
@@ -182,7 +182,7 @@ export function assertState(state) {
       }
     }
 
-    // Process blocks must match allocated programs
+    // Los bloques de proceso deben coincidir con los programas asignados.
     const residentInBlocks = new Set();
     for (const b of blocks) {
       if (b.kind === BlockKind.PROCESS) {

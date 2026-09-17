@@ -2,8 +2,8 @@ import { MIN_ADDRESS, MAX_ADDRESS, KIB, MIB } from './constants.js';
 import { DomainError, ErrorCode } from './errors.js';
 
 /**
- * Calculates the inclusive end address for a contiguous block.
- * Invariant: end = start + sizeBytes - 1
+ * Calcula la dirección final inclusiva de un bloque contiguo.
+ * Invariante: fin = inicio + tamañoEnBytes - 1
  * @param {number} start
  * @param {number} sizeBytes
  * @returns {number}
@@ -26,7 +26,7 @@ export function endAddress(start, sizeBytes) {
 }
 
 /**
- * Formats a numeric address to 24-bit uppercase hex: 0x000000 - 0xFFFFFF.
+ * Formatea una dirección numérica como hexadecimal mayúscula de 24 bits: 0x000000 - 0xFFFFFF.
  * @param {number} address
  * @returns {string}
  */
@@ -41,8 +41,8 @@ export function toHexAddress(address) {
 }
 
 /**
- * Parses a numeric value and unit ('B', 'KiB', 'MiB') into an exact integer byte count.
- * Rejects negative, zero, fractional bytes, NaN, or non-finite values.
+ * Convierte un valor numérico y su unidad ('B', 'KiB', 'MiB') en una cantidad exacta de bytes enteros.
+ * Rechaza valores negativos, cero, bytes fraccionarios, NaN o valores no finitos.
  * @param {number|string} value
  * @param {'B'|'KiB'|'MiB'|string} [unit='B']
  * @returns {number}
@@ -66,7 +66,7 @@ export function parseUnitToBytes(value, unit = 'B') {
   }
 
   const totalBytes = Math.round(numericVal * multiplier);
-  // Ensure the multiplied value is an exact integer without fractional remainder
+  // Comprueba que el valor multiplicado sea un entero exacto, sin fracción residual.
   if (Math.abs(numericVal * multiplier - totalBytes) > 1e-9) {
     throw new DomainError(ErrorCode.INVALID_SIZE, 'Size results in fractional bytes, which is not permitted');
   }
@@ -78,7 +78,7 @@ export function parseUnitToBytes(value, unit = 'B') {
 }
 
 /**
- * Formats a byte size into an intuitive string (B, KiB, or MiB).
+ * Formatea un tamaño en bytes como una cadena legible (B, KiB o MiB).
  * @param {number} bytes
  * @returns {string}
  */

@@ -18,7 +18,7 @@ import { setStatusBanner } from './render.js';
 import { announce } from './accessibility.js';
 
 /**
- * Builds simulation config from the current configuration form inputs.
+ * Construye la configuración de simulación a partir del formulario actual.
  * @returns {import('../domain/constants.js').SimulationConfig}
  */
 function readConfigFromForm() {
@@ -52,16 +52,24 @@ function readConfigFromForm() {
 }
 
 /**
- * Binds all DOM and UI event listeners.
+ * Registra todos los controladores de eventos del DOM y de la interfaz.
  *
  * @param {Object} store
  */
 export function initEvents(store) {
+  let pendingResetConfig = null;
+
   // 1. Mode and Algorithm Selectors
   elements.selectMode.addEventListener('change', () => {
     const state = store.getState();
     if (state.phase === 'RUNNING') {
-      openModal(elements.dialogConfirmReset);
+      try {
+        pendingResetConfig = readConfigFromForm();
+        openModal(elements.dialogConfirmReset);
+      } catch (error) {
+        elements.selectMode.value = state.config.mode;
+        alert(`Configuration error: ${error.message}`);
+      }
       return;
     }
     try {
@@ -92,7 +100,7 @@ export function initEvents(store) {
       store.dispatch({ type: 'RESET', config });
       setStatusBanner({
         type: 'success',
-        message: 'Configuration applied to physical memory map.'
+        message: 'Configuración aplicada al mapa de memoria física.'
       });
     } catch (e) {
       alert(`Configuration error: ${e.message}`);
@@ -106,9 +114,9 @@ export function initEvents(store) {
       if (res.ok) {
         setStatusBanner({
           type: 'success',
-          message: 'Simulation started. Memory configuration locked. You may now allocate programs.'
+          message: 'Simulación iniciada. La configuración de memoria está bloqueada. Ya puedes asignar programas.'
         });
-        announce('Simulation started. Configuration locked.');
+        announce('Simulación iniciada. Configuración bloqueada.');
       } else {
         alert(res.details?.error || res.code);
       }
@@ -121,8 +129,8 @@ export function initEvents(store) {
   elements.btnUndo.addEventListener('click', () => {
     const res = store.dispatch({ type: 'UNDO' });
     if (res.ok) {
-      setStatusBanner({ type: 'success', message: 'Last action undone.' });
-      announce('Undo successful.');
+      setStatusBanner({ type: 'success', message: 'Se deshizo la última acción.' });
+      announce('Deshacer realizado correctamente.');
     }
   });
 
@@ -133,9 +141,9 @@ export function initEvents(store) {
       if (res.ok) {
         setStatusBanner({
           type: 'success',
-          message: `Compaction complete. Relocated ${res.details.bytesMoved} bytes.`
+          message: `Compactación completada. Se desplazaron ${res.details.bytesMoved} bytes.`
         });
-        announce('Memory compacted successfully.');
+        announce('Memoria compactada correctamente.');
       }
     });
   });
@@ -159,31 +167,34 @@ export function initEvents(store) {
     const res = store.dispatch({ type: 'IMPORT_SCENARIO', payload: jsonStr });
     if (res.ok) {
       closeModal(elements.dialogImport);
-      setStatusBanner({ type: 'success', message: 'Scenario imported successfully.' });
-      announce('Scenario imported successfully.');
+      setStatusBanner({ type: 'success', message: 'Escenario importado correctamente.' });
+      announce('Escenario importado correctamente.');
     } else {
       alert(`Import error: ${res.details?.error || res.code}`);
     }
   });
 
   elements.btnReset.addEventListener('click', () => {
+    pendingResetConfig = null;
     openModal(elements.dialogConfirmReset);
   });
 
   elements.btnConfirmReset.addEventListener('click', () => {
     closeModal(elements.dialogConfirmReset);
-    store.dispatch({ type: 'RESET' });
+    const config = pendingResetConfig;
+    pendingResetConfig = null;
+    store.dispatch(config ? { type: 'RESET', config } : { type: 'RESET' });
     setStatusBanner({
       type: 'success',
-      message: 'Simulation reset. Configuration unlocked.'
+      message: 'Simulación reiniciada. Configuración desbloqueada.'
     });
-    announce('Simulation reset.');
+    announce('Simulación reiniciada.');
   });
 
   // 4. Queue Panel & Program Creation
   elements.btnRestoreDefaults.addEventListener('click', () => {
     store.dispatch({ type: 'RESTORE_DEFAULT_PROGRAMS' });
-    setStatusBanner({ type: 'success', message: 'Restored default programs.' });
+    setStatusBanner({ type: 'success', message: 'Programas predeterminados restaurados.' });
   });
 
   elements.btnOpenNewProgram.addEventListener('click', () => {
@@ -207,9 +218,9 @@ export function initEvents(store) {
         closeModal(elements.dialogNewProgram);
         setStatusBanner({
           type: 'success',
-          message: `Created program ${draft.name}. Added to Ready Queue.`
+          message: `Programa ${draft.name} creado. Añadido a la cola.`
         });
-        announce(`Created program ${draft.name}`);
+        announce(`Programa ${draft.name} creado`);
       } else {
         alert(`Cannot create program: ${res.details?.error || res.code}`);
       }
@@ -228,16 +239,16 @@ export function initEvents(store) {
       if (res.ok) {
         setStatusBanner({
           type: 'success',
-          message: `Program ${progId} successfully allocated.`
+          message: `Programa ${progId} asignado correctamente.`
         });
-        announce(`Program ${progId} allocated`);
+        announce(`Programa ${progId} asignado`);
       } else {
         if (res.code === 'EXTERNAL_FRAGMENTATION') {
           setStatusBanner({
             type: 'warning',
-            message: `External fragmentation: total free memory is sufficient, but no single hole is large enough for ${progId}.`,
+            message: `Fragmentación externa: la memoria libre total es suficiente, pero ningún hueco individual tiene espacio para ${progId}.`,
             action: {
-              label: 'Compact and retry',
+              label: 'Compactar y reintentar',
               primary: true,
               onClick: () => {
                 const retryRes = store.dispatch({
@@ -247,9 +258,9 @@ export function initEvents(store) {
                 if (retryRes.ok) {
                   setStatusBanner({
                     type: 'success',
-                    message: `Memory compacted and program ${progId} successfully allocated!`
+                    message: `Memoria compactada y programa ${progId} asignado correctamente.`
                   });
-                  announce(`Memory compacted and program ${progId} allocated`);
+                  announce(`Memoria compactada y programa ${progId} asignado`);
                 } else {
                   alert(`Retry failed: ${retryRes.details?.error || retryRes.code}`);
                 }
@@ -260,9 +271,9 @@ export function initEvents(store) {
         } else {
           setStatusBanner({
             type: 'error',
-            message: `Allocation failed for ${progId}: ${res.details?.error || res.code}`
+            message: `La asignación de ${progId} falló: ${res.details?.error || res.code}`
           });
-          announce(`Allocation failed for ${progId}`);
+          announce(`La asignación de ${progId} falló`);
         }
       }
       return;
@@ -275,9 +286,9 @@ export function initEvents(store) {
       if (res.ok) {
         setStatusBanner({
           type: 'success',
-          message: `Program ${progId} terminated. Memory released and adjacent holes coalesced.`
+          message: `Programa ${progId} terminado. Memoria liberada y huecos adyacentes fusionados.`
         });
-        announce(`Program ${progId} terminated`);
+        announce(`Programa ${progId} terminado`);
       } else {
         alert(`Cannot terminate: ${res.details?.error || res.code}`);
       }

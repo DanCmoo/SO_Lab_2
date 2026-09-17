@@ -6,7 +6,7 @@ import { MemoryMode } from '../domain/constants.js';
 import { elements } from './elements.js';
 
 /**
- * Safely opens a modal dialog.
+ * Abre un diálogo modal de forma segura.
  * @param {HTMLDialogElement} dialog
  */
 export function openModal(dialog) {
@@ -18,7 +18,7 @@ export function openModal(dialog) {
 }
 
 /**
- * Safely closes a modal dialog.
+ * Cierra un diálogo modal de forma segura.
  * @param {HTMLDialogElement} dialog
  */
 export function closeModal(dialog) {
@@ -30,7 +30,7 @@ export function closeModal(dialog) {
 }
 
 /**
- * Opens and renders the Compaction Preview modal.
+ * Abre y renderiza el diálogo de vista previa de compactación.
  *
  * @param {import('../domain/constants.js').SimulationState} state
  * @param {() => void} onConfirm
@@ -38,7 +38,7 @@ export function closeModal(dialog) {
 export function openCompactionPreview(state, onConfirm) {
   const check = canCompactMemory(state);
   if (!check.canCompact) {
-    alert(check.reason || 'Compaction cannot be performed.');
+    alert(check.reason || 'No se puede realizar la compactación.');
     return;
   }
 
@@ -46,7 +46,7 @@ export function openCompactionPreview(state, onConfirm) {
 
   elements.compactPreviewList.innerHTML = '';
   if (relocations.length === 0) {
-    elements.compactPreviewList.innerHTML = '<p class="text-muted">No processes need relocation.</p>';
+    elements.compactPreviewList.innerHTML = '<p class="text-muted">No es necesario reubicar procesos.</p>';
   } else {
     const list = document.createElement('ul');
     list.style.listStyle = 'none';
@@ -71,7 +71,7 @@ export function openCompactionPreview(state, onConfirm) {
 
   elements.txtCompactBytes.textContent = formatBytes(bytesMoved);
 
-  // Set one-time confirm handler
+  // Configura el controlador de confirmación de un solo uso.
   elements.btnConfirmCompaction.onclick = () => {
     closeModal(elements.dialogCompactPreview);
     onConfirm();
@@ -81,7 +81,7 @@ export function openCompactionPreview(state, onConfirm) {
 }
 
 /**
- * Opens and renders the 3-way Algorithm Comparison modal.
+ * Abre y renderiza el diálogo de comparación de tres algoritmos.
  *
  * @param {import('../domain/constants.js').SimulationState} state
  */
@@ -93,7 +93,7 @@ export function openAlgorithmComparison(state) {
   if (isStaticEqual) {
     noteHtml = `
       <div class="alert-banner alert-warning" style="margin-bottom: 16px;">
-        Note: Under equal static partitions, all algorithms select the lowest-address free partition and produce identical allocations.
+        Nota: con particiones estáticas iguales, todos los algoritmos seleccionan la partición libre de menor dirección y producen asignaciones idénticas.
       </div>
     `;
   }
@@ -106,51 +106,51 @@ export function openAlgorithmComparison(state) {
       <table class="accessible-table" style="width: 100%;">
         <thead>
           <tr>
-            <th>Simulation Metric</th>
-            <th>First Fit</th>
-            <th>Best Fit</th>
-            <th>Worst Fit</th>
+            <th>Métrica de simulación</th>
+            <th>Primer ajuste</th>
+            <th>Mejor ajuste</th>
+            <th>Peor ajuste</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td><strong>Successful Allocations</strong></td>
+            <td><strong>Asignaciones exitosas</strong></td>
             <td>${firstFit.allocatedCount}</td>
             <td>${bestFit.allocatedCount}</td>
             <td>${worstFit.allocatedCount}</td>
           </tr>
           <tr>
-            <td><strong>Rejected Allocations</strong></td>
+            <td><strong>Asignaciones rechazadas</strong></td>
             <td>${firstFit.rejectedCount}</td>
             <td>${bestFit.rejectedCount}</td>
             <td>${worstFit.rejectedCount}</td>
           </tr>
           <tr>
-            <td><strong>Total Internal Fragmentation</strong></td>
+            <td><strong>Fragmentación interna total</strong></td>
             <td class="font-mono">${formatBytes(firstFit.internalFragmentationBytes)}</td>
             <td class="font-mono">${formatBytes(bestFit.internalFragmentationBytes)}</td>
             <td class="font-mono">${formatBytes(worstFit.internalFragmentationBytes)}</td>
           </tr>
           <tr>
-            <td><strong>External Free Memory</strong></td>
+            <td><strong>Memoria libre externa</strong></td>
             <td class="font-mono">${formatBytes(firstFit.freeBytes)}</td>
             <td class="font-mono">${formatBytes(bestFit.freeBytes)}</td>
             <td class="font-mono">${formatBytes(worstFit.freeBytes)}</td>
           </tr>
           <tr>
-            <td><strong>Largest Free Hole / Partition</strong></td>
+            <td><strong>Mayor hueco / partición libre</strong></td>
             <td class="font-mono">${formatBytes(firstFit.largestFreeBlockBytes)}</td>
             <td class="font-mono">${formatBytes(bestFit.largestFreeBlockBytes)}</td>
             <td class="font-mono">${formatBytes(worstFit.largestFreeBlockBytes)}</td>
           </tr>
           <tr>
-            <td><strong>Number of Free Holes / Partitions</strong></td>
+            <td><strong>Número de huecos / particiones libres</strong></td>
             <td>${firstFit.freeBlockCount}</td>
             <td>${bestFit.freeBlockCount}</td>
             <td>${worstFit.freeBlockCount}</td>
           </tr>
           <tr>
-            <td><strong>Total Search Probes</strong></td>
+            <td><strong>Total de inspecciones</strong></td>
             <td><strong>${firstFit.totalProbes}</strong></td>
             <td><strong>${bestFit.totalProbes}</strong></td>
             <td><strong>${worstFit.totalProbes}</strong></td>
@@ -165,7 +165,7 @@ export function openAlgorithmComparison(state) {
 }
 
 /**
- * Triggers browser download of scenario JSON file.
+ * Inicia la descarga del archivo JSON del escenario en el navegador.
  * @param {import('../domain/constants.js').SimulationState} state
  */
 export function triggerExportScenario(state) {

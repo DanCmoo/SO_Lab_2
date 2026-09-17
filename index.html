@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Multiprogrammed Memory Simulator</title>
-  <meta name="description" content="Deterministic 24-bit physical address space memory management simulator in Vanilla JavaScript">
+  <title>Simulador de memoria multiprogramada</title>
+  <meta name="description" content="Simulador determinista de gestión de memoria física de 24 bits en JavaScript puro">
   <link rel="stylesheet" href="styles/tokens.css">
   <link rel="stylesheet" href="styles/base.css">
   <link rel="stylesheet" href="styles/layout.css">
@@ -14,38 +14,38 @@
   <!-- Global App Header -->
   <header class="app-header">
     <div class="header-brand">
-      <h1>Memory Simulator</h1>
+      <h1>Simulador de memoria</h1>
       <span class="badge badge-ready font-mono">16 MiB (24-bit)</span>
     </div>
 
     <div class="header-controls">
       <div class="control-group">
-        <label for="select-mode">Mode:</label>
+        <label for="select-mode">Modo:</label>
         <select id="select-mode">
-          <option value="STATIC_EQUAL">Static partitions — equal size</option>
-          <option value="STATIC_UNEQUAL">Static partitions — unequal size</option>
-          <option value="DYNAMIC_NO_COMPACTION">Dynamic partitions — no compaction</option>
-          <option value="DYNAMIC_COMPACTION">Dynamic partitions — with compaction</option>
+          <option value="STATIC_EQUAL">Particiones estáticas — tamaño igual</option>
+          <option value="STATIC_UNEQUAL">Particiones estáticas — tamaño desigual</option>
+          <option value="DYNAMIC_NO_COMPACTION">Particiones dinámicas — sin compactación</option>
+          <option value="DYNAMIC_COMPACTION">Particiones dinámicas — con compactación</option>
         </select>
       </div>
 
       <div class="control-group">
-        <label for="select-algorithm">Algorithm:</label>
+        <label for="select-algorithm">Algoritmo:</label>
         <select id="select-algorithm">
-          <option value="FIRST_FIT">First fit</option>
-          <option value="BEST_FIT">Best fit</option>
-          <option value="WORST_FIT">Worst fit</option>
+          <option value="FIRST_FIT">Primer ajuste</option>
+          <option value="BEST_FIT">Mejor ajuste</option>
+          <option value="WORST_FIT">Peor ajuste</option>
         </select>
       </div>
 
       <div class="header-actions">
-        <button id="btn-start-sim" class="btn-primary" type="button">Start simulation</button>
-        <button id="btn-undo" type="button" disabled title="Undo last state change (Ctrl+Z)">Undo</button>
-        <button id="btn-compact-top" type="button" disabled title="Compact memory in dynamic mode">Compact</button>
-        <button id="btn-compare" type="button" title="Compare First, Best, and Worst fit">Compare</button>
-        <button id="btn-export-scenario" type="button" title="Export current state to JSON">Export</button>
-        <button id="btn-import-scenario" type="button" title="Import scenario from JSON">Import</button>
-        <button id="btn-reset" class="btn-danger" type="button" title="Reset simulation">Reset</button>
+        <button id="btn-start-sim" class="btn-primary" type="button">Iniciar simulación</button>
+        <button id="btn-undo" type="button" disabled title="Deshacer el último cambio (Ctrl+Z)">Deshacer</button>
+        <button id="btn-compact-top" type="button" disabled title="Compactar memoria en modo dinámico">Compactar</button>
+        <button id="btn-compare" type="button" title="Comparar primer, mejor y peor ajuste">Comparar</button>
+        <button id="btn-export-scenario" type="button" title="Exportar el estado actual a JSON">Exportar</button>
+        <button id="btn-import-scenario" type="button" title="Importar un escenario desde JSON">Importar</button>
+        <button id="btn-reset" class="btn-danger" type="button" title="Reiniciar simulación">Reiniciar</button>
       </div>
     </div>
   </header>
@@ -57,13 +57,13 @@
       <!-- Configuration Card -->
       <section class="panel-card" id="sec-config" aria-labelledby="heading-config">
         <div class="panel-card-header">
-          <h2 id="heading-config">Configuration</h2>
-          <span id="badge-sim-phase" class="badge badge-ready">Configuring</span>
+          <h2 id="heading-config">Configuración</h2>
+          <span id="badge-sim-phase" class="badge badge-ready">Configurando</span>
         </div>
 
         <form id="form-config" onsubmit="return false;">
           <div class="form-field">
-            <label for="input-os-size">OS Reservation:</label>
+            <label for="input-os-size">Reserva del sistema operativo:</label>
             <div class="input-with-unit">
               <input id="input-os-size" type="number" step="any" min="0" value="1" required>
               <select id="select-os-unit">
@@ -75,28 +75,28 @@
           </div>
 
           <div id="group-equal-config" class="form-field">
-            <label for="input-equal-count">Equal Partition Count:</label>
+            <label for="input-equal-count">Cantidad de particiones iguales:</label>
             <input id="input-equal-count" type="number" min="1" max="64" value="5">
-            <small id="txt-equal-calc" class="font-mono text-muted">Each: 3 MiB</small>
+            <small id="txt-equal-calc" class="font-mono text-muted">Cada una: 3 MiB</small>
           </div>
 
           <div id="group-unequal-config" class="form-field" style="display: none;">
-            <label for="input-unequal-sizes">Unequal Sizes (comma-separated MiB):</label>
+            <label for="input-unequal-sizes">Tamaños desiguales (MiB separados por comas):</label>
             <input id="input-unequal-sizes" type="text" value="1, 2, 3, 4, 5">
-            <small id="txt-unequal-calc" class="font-mono text-muted">Sum: 15 MiB / 15 MiB</small>
+            <small id="txt-unequal-calc" class="font-mono text-muted">Suma: 15 MiB / 15 MiB</small>
           </div>
 
-          <button id="btn-apply-config" class="btn-sm" type="button">Apply to Memory</button>
+          <button id="btn-apply-config" class="btn-sm" type="button">Aplicar a la memoria</button>
         </form>
       </section>
 
       <!-- Program Ready Queue Card -->
       <section class="panel-card" id="sec-queue" aria-labelledby="heading-queue">
         <div class="panel-card-header">
-          <h2 id="heading-queue">Ready Queue</h2>
+          <h2 id="heading-queue">Cola de procesos</h2>
           <div class="header-btns">
-            <button id="btn-open-new-program" class="btn-sm btn-primary" type="button">+ New</button>
-            <button id="btn-restore-defaults" class="btn-sm" type="button" title="Restore 5 default programs">Defaults</button>
+            <button id="btn-open-new-program" class="btn-sm btn-primary" type="button">+ Nuevo</button>
+            <button id="btn-restore-defaults" class="btn-sm" type="button" title="Restaurar los 5 programas predeterminados">Predeterminados</button>
           </div>
         </div>
 
@@ -111,15 +111,15 @@
       <section class="panel-card memory-map-container" id="sec-memory-map" aria-labelledby="heading-map">
         <div class="panel-card-header">
           <div>
-            <h2 id="heading-map">Physical Memory Map</h2>
+            <h2 id="heading-map">Mapa de memoria física</h2>
             <small class="font-mono text-muted">0x000000 &mdash; 0xFFFFFF (16,777,216 Bytes)</small>
           </div>
-          <button id="btn-toggle-table" class="btn-sm" type="button" aria-expanded="false">View as Table</button>
+          <button id="btn-toggle-table" class="btn-sm" type="button" aria-expanded="false">Ver como tabla</button>
         </div>
 
         <!-- Notification / Status Banner -->
         <div id="status-banner" class="alert-banner alert-success" role="status">
-          <span id="status-text">Ready. Configure parameters and select Start simulation.</span>
+          <span id="status-text">Listo. Configura los parámetros y selecciona Iniciar simulación.</span>
           <div id="status-actions"></div>
         </div>
 
@@ -127,7 +127,7 @@
         <div class="memory-map-rails-wrapper">
           <!-- Left Rail: True Proportional Scale -->
           <div class="proportional-rail" id="proportional-rail" title="Proportional True Scale Overview (16 MiB)">
-            <span class="rail-label">Scale</span>
+            <span class="rail-label">Escala</span>
             <!-- Proportional slices rendered dynamically -->
           </div>
 
@@ -142,13 +142,13 @@
           <table class="accessible-table" id="accessible-memory-table">
             <thead>
               <tr>
-                <th>Block ID</th>
-                <th>Type</th>
-                <th>Start Hex</th>
-                <th>End Hex</th>
-                <th>Size</th>
-                <th>Resident Program</th>
-                <th>Internal Frag</th>
+                <th>ID del bloque</th>
+                <th>Tipo</th>
+                <th>Inicio hexadecimal</th>
+                <th>Fin hexadecimal</th>
+                <th>Tamaño</th>
+                <th>Programa residente</th>
+                <th>Fragmentación interna</th>
               </tr>
             </thead>
             <tbody id="accessible-table-body">
@@ -159,45 +159,45 @@
       </section>
     </div>
 
-    <!-- Right Column: Metrics, Inspector & History -->
+    <!-- Right Column: Metrics & Inspector -->
     <div class="panel-col panel-col-right">
       <!-- Continuous Metrics Card -->
       <section class="panel-card" id="sec-metrics" aria-labelledby="heading-metrics">
         <div class="panel-card-header">
-          <h2 id="heading-metrics">Metrics</h2>
+          <h2 id="heading-metrics">Métricas</h2>
         </div>
 
         <div class="metrics-grid">
           <div class="metric-box">
-            <span class="metric-label">Allocated Memory</span>
+            <span class="metric-label">Memoria asignada</span>
             <span class="metric-value" id="metric-allocated">0 B</span>
           </div>
           <div class="metric-box">
-            <span class="metric-label">Free Memory</span>
+            <span class="metric-label">Memoria libre</span>
             <span class="metric-value" id="metric-free">15 MiB</span>
           </div>
           <div class="metric-box">
-            <span class="metric-label">Utilization</span>
+            <span class="metric-label">Utilización</span>
             <span class="metric-value" id="metric-utilization">0%</span>
           </div>
           <div class="metric-box">
-            <span class="metric-label">Internal Frag</span>
+            <span class="metric-label">Fragmentación interna</span>
             <span class="metric-value" id="metric-internal-frag">0 B</span>
           </div>
           <div class="metric-box">
-            <span class="metric-label">Largest Free Hole</span>
+            <span class="metric-label">Mayor hueco libre</span>
             <span class="metric-value" id="metric-largest-hole">15 MiB</span>
           </div>
           <div class="metric-box">
-            <span class="metric-label">Free Holes/Parts</span>
+            <span class="metric-label">Huecos/particiones libres</span>
             <span class="metric-value" id="metric-free-count">1</span>
           </div>
           <div class="metric-box">
-            <span class="metric-label">Resident Progs</span>
+            <span class="metric-label">Procesos residentes</span>
             <span class="metric-value" id="metric-resident-count">0</span>
           </div>
           <div class="metric-box">
-            <span class="metric-label">Last Search Probes</span>
+            <span class="metric-label">Últimas inspecciones</span>
             <span class="metric-value" id="metric-probes">0</span>
           </div>
         </div>
@@ -206,22 +206,13 @@
       <!-- Selected Block Inspector Card -->
       <section class="panel-card" id="sec-inspector" aria-labelledby="heading-inspector">
         <div class="panel-card-header">
-          <h3 id="heading-inspector">Block Inspector</h3>
+          <h3 id="heading-inspector">Inspector de bloques</h3>
         </div>
         <div id="inspector-content" class="inspector-details">
-          <p class="text-muted" style="font-size: 0.85rem;">Click any memory block on the map to inspect addresses, program details, and internal segments.</p>
+          <p class="text-muted" style="font-size: 0.85rem;">Haz clic en un bloque del mapa para consultar sus direcciones, detalles del programa y segmentos internos.</p>
         </div>
       </section>
 
-      <!-- Event History Log Card -->
-      <section class="panel-card" id="sec-history" aria-labelledby="heading-history">
-        <div class="panel-card-header">
-          <h3 id="heading-history">Event History</h3>
-        </div>
-        <div class="history-feed" id="history-feed" role="log" aria-label="Simulation state changes">
-          <!-- History entries rendered dynamically -->
-        </div>
-      </section>
     </div>
   </main>
 
@@ -230,30 +221,30 @@
   <!-- Custom Program Modal -->
   <dialog id="dialog-new-program">
     <div class="dialog-header">
-      <h3>Create Custom Program</h3>
+      <h3>Crear programa personalizado</h3>
       <button class="btn-sm btn-close-dialog" type="button" aria-label="Close dialog">&times;</button>
     </div>
     <form id="form-new-program" onsubmit="return false;">
       <div class="form-field">
-        <label for="input-prog-name">Program Display Name:</label>
-        <input id="input-prog-name" type="text" maxlength="60" placeholder="e.g. Graphic Renderer" required>
+        <label for="input-prog-name">Nombre visible del programa:</label>
+        <input id="input-prog-name" type="text" maxlength="60" placeholder="p. ej., Renderizador gráfico" required>
       </div>
 
       <div class="form-field">
-        <label>Segments:</label>
+        <label>Segmentos:</label>
         <div id="new-prog-segments-list" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;">
           <!-- Segment inputs rendered dynamically -->
         </div>
-        <button id="btn-add-segment-row" class="btn-sm" type="button">+ Add Segment</button>
+        <button id="btn-add-segment-row" class="btn-sm" type="button">+ Añadir segmento</button>
       </div>
 
       <div style="margin-top: 12px; font-weight: 600;">
-        Total Calculated Size: <span id="txt-calc-prog-size" class="font-mono">0 B</span>
+        Tamaño total calculado: <span id="txt-calc-prog-size" class="font-mono">0 B</span>
       </div>
 
       <div class="dialog-actions">
-        <button class="btn-close-dialog" type="button">Cancel</button>
-        <button id="btn-save-custom-prog" class="btn-primary" type="button">Add to Ready Queue</button>
+        <button class="btn-close-dialog" type="button">Cancelar</button>
+        <button id="btn-save-custom-prog" class="btn-primary" type="button">Añadir a la cola</button>
       </div>
     </form>
   </dialog>
@@ -261,74 +252,74 @@
   <!-- Compaction Preview Modal -->
   <dialog id="dialog-compact-preview">
     <div class="dialog-header">
-      <h3>Memory Compaction Preview</h3>
+      <h3>Vista previa de compactación de memoria</h3>
       <button class="btn-sm btn-close-dialog" type="button" aria-label="Close dialog">&times;</button>
     </div>
     <div>
-      <p style="margin-bottom: 12px;">Processes will be relocated toward lower addresses in physical start order:</p>
+      <p style="margin-bottom: 12px;">Los procesos se reubicarán hacia direcciones inferiores según su orden físico:</p>
       <div id="compact-preview-list" style="max-height: 250px; overflow-y: auto; margin-bottom: 12px;"></div>
-      <p style="font-weight: 600;">Total Memory Moved: <span id="txt-compact-bytes" class="font-mono">0 B</span></p>
+      <p style="font-weight: 600;">Memoria total desplazada: <span id="txt-compact-bytes" class="font-mono">0 B</span></p>
     </div>
     <div class="dialog-actions">
-      <button class="btn-close-dialog" type="button">Cancel</button>
-      <button id="btn-confirm-compaction" class="btn-primary" type="button">Execute Compaction</button>
+      <button class="btn-close-dialog" type="button">Cancelar</button>
+      <button id="btn-confirm-compaction" class="btn-primary" type="button">Ejecutar compactación</button>
     </div>
   </dialog>
 
   <!-- Compare Algorithms Modal -->
   <dialog id="dialog-compare" style="max-width: 850px;">
     <div class="dialog-header">
-      <h3>Allocation Algorithm Comparison</h3>
+      <h3>Comparación de algoritmos de asignación</h3>
       <button class="btn-sm btn-close-dialog" type="button" aria-label="Close dialog">&times;</button>
     </div>
     <div id="compare-modal-content">
       <!-- Comparison table rendered dynamically -->
     </div>
     <div class="dialog-actions">
-      <button class="btn-close-dialog" type="button">Close</button>
+      <button class="btn-close-dialog" type="button">Cerrar</button>
     </div>
   </dialog>
 
   <!-- Scenario Import Modal -->
   <dialog id="dialog-import">
     <div class="dialog-header">
-      <h3>Import Scenario JSON</h3>
+      <h3>Importar escenario JSON</h3>
       <button class="btn-sm btn-close-dialog" type="button" aria-label="Close dialog">&times;</button>
     </div>
     <div>
       <div class="form-field">
-        <label for="textarea-scenario-json">Paste exported simulation JSON:</label>
+        <label for="textarea-scenario-json">Pega el JSON exportado de la simulación:</label>
         <textarea id="textarea-scenario-json" rows="10" style="width: 100%; font-family: var(--font-mono); font-size: 0.8rem;"></textarea>
       </div>
     </div>
     <div class="dialog-actions">
-      <button class="btn-close-dialog" type="button">Cancel</button>
-      <button id="btn-confirm-import" class="btn-primary" type="button">Load Scenario</button>
+      <button class="btn-close-dialog" type="button">Cancelar</button>
+      <button id="btn-confirm-import" class="btn-primary" type="button">Cargar escenario</button>
     </div>
   </dialog>
 
   <!-- Reset Confirmation Modal -->
   <dialog id="dialog-confirm-reset">
     <div class="dialog-header">
-      <h3>Confirm Simulation Reset</h3>
+      <h3>Confirmar reinicio de la simulación</h3>
       <button class="btn-sm btn-close-dialog" type="button" aria-label="Close dialog">&times;</button>
     </div>
-    <p>Resetting will clear all current allocations and unlock configuration parameters. Continue?</p>
+    <p>El reinicio eliminará todas las asignaciones actuales y desbloqueará los parámetros de configuración. ¿Deseas continuar?</p>
     <div class="dialog-actions">
-      <button class="btn-close-dialog" type="button">Cancel</button>
-      <button id="btn-confirm-reset" class="btn-danger" type="button">Reset</button>
+      <button class="btn-close-dialog" type="button">Cancelar</button>
+      <button id="btn-confirm-reset" class="btn-danger" type="button">Reiniciar</button>
     </div>
   </dialog>
 
   <!-- Resume Prompt Modal -->
   <dialog id="dialog-resume">
     <div class="dialog-header">
-      <h3>Resume Simulation</h3>
+      <h3>Reanudar simulación</h3>
     </div>
-    <p>A saved simulation was found in local storage. Would you like to resume where you left off or start over?</p>
+    <p>Se encontró una simulación guardada en el almacenamiento local. ¿Quieres reanudarla o empezar de nuevo?</p>
     <div class="dialog-actions">
-      <button id="btn-resume-start-over" type="button">Start Over</button>
-      <button id="btn-resume-confirm" class="btn-primary" type="button">Resume Simulation</button>
+      <button id="btn-resume-start-over" type="button">Empezar de nuevo</button>
+      <button id="btn-resume-confirm" class="btn-primary" type="button">Reanudar simulación</button>
     </div>
   </dialog>
 

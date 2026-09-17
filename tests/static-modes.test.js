@@ -18,7 +18,7 @@ test('Static Equal: AC-02 5 equal partitions of 3 MiB cover 15 MiB user space', 
 });
 
 test('Static Equal: AC-03 2 MiB program in 3 MiB partition reports 1 MiB internal fragmentation', () => {
-  const programs = getDefaultPrograms(); // P1 is 2 MiB
+  const programs = getDefaultPrograms(); // P1 tiene 2 MiB.
   const state = createInitialState({ mode: MemoryMode.STATIC_EQUAL }, programs);
 
   const result = allocateStaticEqual(state, 'P1');
@@ -29,7 +29,7 @@ test('Static Equal: AC-03 2 MiB program in 3 MiB partition reports 1 MiB interna
 
   assert.doesNotThrow(() => assertState(result.state));
 
-  // Terminate P1
+  // Termina P1.
   const terminatedState = terminateStatic(result.state, 'P1');
   assert.equal(terminatedState.programs.find(p => p.id === 'P1').status, 'terminated');
   assert.equal(terminatedState.partitions.find(p => p.id === 'PART-1').programId, null);
@@ -38,13 +38,13 @@ test('Static Equal: AC-03 2 MiB program in 3 MiB partition reports 1 MiB interna
 
 test('Static Unequal: allocates according to algorithm policy', () => {
   const programs = getDefaultPrograms(); // P1: 2 MiB, P2: 3 MiB
-  // Unequal partitions: 1 MiB, 2 MiB, 3 MiB, 4 MiB, 5 MiB
+  // Particiones desiguales: 1 MiB, 2 MiB, 3 MiB, 4 MiB y 5 MiB.
   const state = createInitialState(
     { mode: MemoryMode.STATIC_UNEQUAL, algorithm: AllocationAlgorithm.BEST_FIT },
     programs
   );
 
-  // P1 (2 MiB) with Best Fit should choose PART-2 (2 MiB) with 0 internal fragmentation
+  // P1 (2 MiB) con mejor ajuste debe elegir PART-2 (2 MiB), sin fragmentación interna.
   const result = allocateStaticUnequal(state, 'P1');
   assert.equal(result.partitionId, 'PART-2');
   assert.equal(result.internalFragmentationBytes, 0);

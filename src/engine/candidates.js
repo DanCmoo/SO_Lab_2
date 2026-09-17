@@ -1,8 +1,8 @@
 import { BlockKind, MemoryMode } from '../domain/constants.js';
 
 /**
- * Extracts normalized allocation candidates from a SimulationState.
- * All candidate arrays are guaranteed to be sorted by ascending start address.
+ * Extrae candidatos de asignación normalizados a partir de un estado.
+ * Todos los candidatos se ordenan por dirección inicial ascendente.
  *
  * @param {import('../domain/constants.js').SimulationState} state
  * @returns {Array<{id: string, start: number, capacityBytes: number, type: 'partition'|'hole'}>}
@@ -22,7 +22,7 @@ export function extractCandidates(state) {
       .sort((a, b) => a.start - b.start);
   }
 
-  // Dynamic modes
+  // Modos dinámicos.
   return blocks
     .filter(b => b.kind === BlockKind.HOLE)
     .map(h => ({

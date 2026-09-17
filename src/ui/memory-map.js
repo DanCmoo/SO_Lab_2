@@ -4,23 +4,29 @@ import { layoutSegments } from '../engine/compaction.js';
 import { elements } from './elements.js';
 
 /**
- * Renders the dual-rail physical memory map and accessible table representation.
+ * Renderiza el mapa de memoria física de doble carril y su representación tabular accesible.
  *
  * @param {import('../domain/constants.js').SimulationState} state
  * @param {(id: string) => void} onSelectBlock
  */
 export function renderMemoryMap(state, onSelectBlock) {
   const { blocks, programs, partitions, selectedId, config } = state;
+  const blockTypeLabels = {
+    OS: 'Sistema operativo',
+    PARTITION: 'Partición',
+    PROCESS: 'Proceso',
+    HOLE: 'Hueco libre'
+  };
   const isStatic =
     config.mode === MemoryMode.STATIC_EQUAL ||
     config.mode === MemoryMode.STATIC_UNEQUAL;
 
-  // 1. Render Left Proportional Rail
+  // 1. Renderiza el carril proporcional izquierdo.
   const propFragment = document.createDocumentFragment();
-  // Preserve rail label
+  // Conserva la etiqueta del carril.
   const labelSpan = document.createElement('span');
   labelSpan.className = 'rail-label';
-  labelSpan.textContent = 'Scale';
+  labelSpan.textContent = 'Escala';
   propFragment.appendChild(labelSpan);
 
   for (const block of blocks) {
@@ -49,7 +55,7 @@ export function renderMemoryMap(state, onSelectBlock) {
   elements.proportionalRail.innerHTML = '';
   elements.proportionalRail.appendChild(propFragment);
 
-  // 2. Render Right Detailed Rail
+  // 2. Renderiza el carril detallado derecho.
   const detailedFragment = document.createDocumentFragment();
 
   for (const block of blocks) {
@@ -72,12 +78,12 @@ export function renderMemoryMap(state, onSelectBlock) {
     let internalFragBytes = 0;
 
     if (block.kind === BlockKind.OS) {
-      titleText = 'Operating System';
+      titleText = 'Sistema operativo';
     } else if (block.kind === BlockKind.HOLE) {
-      titleText = 'Free Memory Hole';
+      titleText = 'Hueco de memoria libre';
     } else if (block.kind === BlockKind.PROCESS) {
       residentProg = programs.find(p => p.id === block.programId);
-      titleText = residentProg ? `${residentProg.name} (${residentProg.id})` : `Process ${block.programId}`;
+      titleText = residentProg ? `${residentProg.name} (${residentProg.id})` : `Proceso ${block.programId}`;
       if (residentProg?.colorToken) {
         card.style.setProperty('--prog-color', residentProg.colorToken);
       }
@@ -85,13 +91,13 @@ export function renderMemoryMap(state, onSelectBlock) {
       const partition = partitions.find(p => p.start === block.start && p.sizeBytes === block.sizeBytes);
       if (partition?.programId) {
         residentProg = programs.find(p => p.id === partition.programId);
-        titleText = `${partition.id}: ${residentProg?.name || residentProg?.id || 'Assigned'}`;
+        titleText = `${partition.id}: ${residentProg?.name || residentProg?.id || 'Asignada'}`;
         internalFragBytes = partition.sizeBytes - (residentProg?.sizeBytes || 0);
         if (residentProg?.colorToken) {
           card.style.setProperty('--prog-color', residentProg.colorToken);
         }
       } else {
-        titleText = `${partition?.id || block.id} (Free Partition)`;
+        titleText = `${partition?.id || block.id} (Partición libre)`;
       }
     }
 
@@ -105,7 +111,7 @@ export function renderMemoryMap(state, onSelectBlock) {
       </div>
     `;
 
-    // Render nested segments if resident program is present
+    // Renderiza los segmentos anidados si hay un programa residente.
     if (residentProg) {
       const segmentsWrapper = document.createElement('div');
       segmentsWrapper.className = 'segments-container';
@@ -120,13 +126,13 @@ export function renderMemoryMap(state, onSelectBlock) {
         segmentsWrapper.appendChild(segSlice);
       }
 
-      // If occupied partition has internal fragmentation, add fragmentation slice
+      // Si una partición ocupada tiene fragmentación interna, añade una sección para ella.
       if (internalFragBytes > 0) {
         const fragSlice = document.createElement('div');
         fragSlice.className = 'internal-frag-slice';
         fragSlice.style.flex = `${internalFragBytes}`;
-        fragSlice.textContent = `Internal Frag: ${formatBytes(internalFragBytes)}`;
-        fragSlice.title = `Unused space inside partition: ${formatBytes(internalFragBytes)}`;
+        fragSlice.textContent = `Frag. interna: ${formatBytes(internalFragBytes)}`;
+        fragSlice.title = `Espacio sin usar dentro de la partición: ${formatBytes(internalFragBytes)}`;
         segmentsWrapper.appendChild(fragSlice);
       }
 
@@ -173,7 +179,7 @@ export function renderMemoryMap(state, onSelectBlock) {
 
     tr.innerHTML = `
       <td class="font-mono">${block.id}</td>
-      <td>${block.kind}</td>
+      <td>${blockTypeLabels[block.kind] || block.kind}</td>
       <td class="font-mono">${startHex}</td>
       <td class="font-mono">${endHex}</td>
       <td class="font-mono">${sizeStr}</td>
