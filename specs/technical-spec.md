@@ -167,6 +167,7 @@ The implementation should use JSDoc typedefs and runtime validation.
  * @property {number} nextSequence
  * @property {string|null} selectedId
  * @property {AllocationTrace|null} lastTrace
+ * @property {{bytesMoved:number, relocations:Array, triggeredByProgramId:string}|null} lastCompaction
  */
 ```
 
@@ -440,8 +441,7 @@ Compaction is valid only in `DYNAMIC_COMPACTION` mode.
 ### 13.1 Preconditions
 
 - Simulation phase is `RUNNING`.
-- At least two non-adjacent holes exist, or an allocation retry is waiting after `EXTERNAL_FRAGMENTATION`.
-- There is no in-progress UI transition.
+- An `ALLOCATE_PROGRAM` operation in `DYNAMIC_COMPACTION` has received `EXTERNAL_FRAGMENTATION` from the pure dynamic allocator.
 
 ### 13.2 Algorithm
 
@@ -465,8 +465,10 @@ Requirements:
 - Do not change process or segment sizes.
 - Recalculate segment addresses from the new process start.
 - Report `bytesMoved` as the sum of sizes of relocated processes.
-- Commit compaction as one undoable command.
-- `Compact and retry` must commit compaction and allocation as one compound history operation; if allocation unexpectedly fails, roll back both.
+- The public allocation facade catches only `EXTERNAL_FRAGMENTATION`, runs compaction, and retries the allocation in the same call.
+- The resulting state records `lastCompaction` with `bytesMoved`, `relocations`, and `triggeredByProgramId`.
+- The enclosing `ALLOCATE_PROGRAM` is the sole undoable command: undo restores the state before both compaction and allocation.
+- `INSUFFICIENT_TOTAL_MEMORY` and every other failure propagate without compacting.
 
 Complexity is `O(p)`, where `p` is the number of resident processes.
 
@@ -507,8 +509,6 @@ Supported commands:
  * | {type:'CREATE_PROGRAM', payload:ProgramDraft}
  * | {type:'ALLOCATE_PROGRAM', programId:string}
  * | {type:'TERMINATE_PROGRAM', programId:string}
- * | {type:'COMPACT_MEMORY'}
- * | {type:'COMPACT_AND_RETRY', programId:string}
  * | {type:'UNDO'}
  * | {type:'RESET', config?:SimulationConfig}
  * | {type:'RESTORE_DEFAULT_PROGRAMS'}
@@ -833,9 +833,11 @@ Expected:
 - Initialize each mode and verify full address coverage.
 - Allocate all default programs in multiple orders.
 - Terminate middle processes and verify holes.
-- Trigger external fragmentation, compact, and retry.
+- Trigger external fragmentation in `DYNAMIC_COMPACTION` and verify that one allocation automatically compacts and retries.
+- Verify `DYNAMIC_NO_COMPACTION` still returns `EXTERNAL_FRAGMENTATION` for the same layout.
+- Verify undo after automatic compaction restores the original fragmented state in one step.
 - Change algorithms mid-simulation and verify existing addresses remain unchanged.
-- Undo allocation, termination, and compaction.
+- Undo allocation, termination, and the combined automatic-compaction allocation.
 - Export, import, and compare equivalent states.
 
 ### 25.4 Property-based invariants
@@ -853,7 +855,7 @@ For generated valid command sequences:
 ## 26. Performance Requirements
 
 - Support at least 500 programs and 1,000 memory blocks without incorrect behavior.
-- A single allocation, termination, or compaction should complete within 50 ms on a typical modern laptop for 1,000 blocks, excluding animation.
+- A single allocation (including automatic compaction when required) or termination should complete within 50 ms on a typical modern laptop for 1,000 blocks, excluding animation.
 - UI animation must not exceed 300 ms by default and must respect `prefers-reduced-motion`.
 - Rendering must not use one DOM element per byte, KiB, or fixed address unit.
 - Comparison runs must execute in memory without blocking the main thread for more than 100 ms; if scenarios grow beyond this threshold, chunk work or use a Web Worker.
@@ -893,7 +895,7 @@ For generated valid command sequences:
 - All addresses remain within `0x000000–0xFFFFFF`.
 - Static modes report internal fragmentation correctly.
 - Dynamic modes split and coalesce holes correctly.
-- Compaction preserves process order and yields one final hole.
+- Automatic compaction preserves process order, yields one final hole, and is visible as part of its triggering allocation.
 - Keyboard-only operation covers every command.
 - UI text and controls meet WCAG AA contrast requirements.
 - The app runs from a static server without a build step.

@@ -1,8 +1,8 @@
-import { SimulationPhase } from '../domain/constants.js';
+import { SimulationPhase, ProgramStatus } from '../domain/constants.js';
 import { DomainError, ErrorCode } from '../domain/errors.js';
 import { createProgram, createInitialState, createSimulationConfig } from '../domain/models.js';
 import { getDefaultPrograms } from '../data/default-programs.js';
-import { allocate, terminate, compact } from '../engine/simulator.js';
+import { allocate, terminate } from '../engine/simulator.js';
 import { importScenario } from './persistence.js';
 
 /**
@@ -22,7 +22,13 @@ export function reduceCommand(state, command) {
     switch (command.type) {
       case 'START_SIMULATION': {
         const config = command.config ? createSimulationConfig(command.config) : state.config;
-        const freshInitial = createInitialState(config, state.programs);
+        const freshInitial = createInitialState(config, state.programs.map(p => ({
+          ...p,
+          status: ProgramStatus.READY,
+          start: null,
+          end: null,
+          containerId: null
+        })));
         const newState = {
           ...freshInitial,
           phase: SimulationPhase.RUNNING,
@@ -83,7 +89,10 @@ export function reduceCommand(state, command) {
             programId: command.programId,
             partitionId: result.partitionId,
             internalFragmentationBytes: result.internalFragmentationBytes,
-            probes: result.trace?.probes
+            probes: result.trace?.probes,
+            autoCompacted: Boolean(result.autoCompacted),
+            compactionBytesMoved: result.compactionBytesMoved || 0,
+            compactionRelocations: result.compactionRelocations || []
           }
         };
       }
@@ -95,35 +104,6 @@ export function reduceCommand(state, command) {
           state: newState,
           code: 'PROGRAM_TERMINATED',
           details: { programId: command.programId }
-        };
-      }
-
-      case 'COMPACT_MEMORY': {
-        const result = compact(state);
-        return {
-          ok: true,
-          state: result.state,
-          code: 'MEMORY_COMPACTED',
-          details: {
-            relocations: result.relocations,
-            bytesMoved: result.bytesMoved
-          }
-        };
-      }
-
-      case 'COMPACT_AND_RETRY': {
-        // Compound atomic action: compact, then allocate target program
-        const compactResult = compact(state);
-        const allocateResult = allocate(compactResult.state, command.programId);
-        return {
-          ok: true,
-          state: allocateResult.state,
-          code: 'COMPACT_AND_RETRY_SUCCESS',
-          details: {
-            programId: command.programId,
-            bytesMoved: compactResult.bytesMoved,
-            relocations: compactResult.relocations
-          }
         };
       }
 
@@ -145,6 +125,13 @@ export function reduceCommand(state, command) {
       }
 
       case 'RESTORE_DEFAULT_PROGRAMS': {
+        const hasAllocatedPrograms = state.programs.some(p => p.status === ProgramStatus.ALLOCATED);
+        if (hasAllocatedPrograms) {
+          throw new DomainError(
+            ErrorCode.INVALID_CONFIGURATION,
+            'Cannot restore default programs while programs are allocated. Reset the simulation first.'
+          );
+        }
         const defaultPrograms = getDefaultPrograms();
         const newState = {
           ...state,

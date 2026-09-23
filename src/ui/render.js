@@ -1,7 +1,7 @@
-import { MemoryMode, BlockKind, ProgramStatus } from '../domain/constants.js';
+import { MemoryMode, BlockKind, ProgramStatus, MIB } from '../domain/constants.js';
 import { toHexAddress, formatBytes } from '../domain/address.js';
 import { deriveMetrics } from '../domain/metrics.js';
-import { canCompactMemory, layoutSegments } from '../engine/compaction.js';
+import { layoutSegments } from '../engine/compaction.js';
 import { renderMemoryMap } from './memory-map.js';
 import { updateConfigFormVisibility } from './forms.js';
 import { elements } from './elements.js';
@@ -29,6 +29,16 @@ export function renderApp(state, store) {
   if (elements.selectAlgorithm.value !== config.algorithm) {
     elements.selectAlgorithm.value = config.algorithm;
   }
+  if (Number(elements.inputOsSize.value) * MIB !== config.osBytes || elements.selectOsUnit.value !== 'MiB') {
+    elements.inputOsSize.value = config.osBytes / MIB;
+    elements.selectOsUnit.value = 'MiB';
+  }
+  if (config.mode === MemoryMode.STATIC_EQUAL && config.equalPartitionCount !== null) {
+    elements.inputEqualCount.value = config.equalPartitionCount;
+  }
+  if (config.mode === MemoryMode.STATIC_UNEQUAL) {
+    elements.inputUnequalSizes.value = config.unequalPartitionSizes.map(size => size / MIB).join(', ');
+  }
 
   elements.btnUndo.disabled = !store.canUndo();
 
@@ -43,9 +53,6 @@ export function renderApp(state, store) {
     elements.badgeSimPhase.textContent = 'Configurando';
     elements.badgeSimPhase.className = 'badge badge-ready';
   }
-
-  const compactCheck = canCompactMemory(state);
-  elements.btnCompactTop.disabled = !compactCheck.canCompact;
 
   // 2. Actualiza el estado del formulario de configuración.
   updateConfigFormVisibility(state);
@@ -66,10 +73,12 @@ export function renderApp(state, store) {
     const segmentSummary = prog.segments.map(s => `${s.name} ${formatBytes(s.sizeBytes)}`).join(', ');
 
     let actionBtnHtml = '';
-    if (prog.status === ProgramStatus.READY) {
+    if (isRunning && prog.status === ProgramStatus.READY) {
       actionBtnHtml = `<button class="btn-sm btn-primary btn-allocate" data-id="${prog.id}" type="button">Asignar</button>`;
-    } else if (prog.status === ProgramStatus.ALLOCATED) {
+    } else if (isRunning && prog.status === ProgramStatus.ALLOCATED) {
       actionBtnHtml = `<button class="btn-sm btn-danger btn-terminate" data-id="${prog.id}" type="button">Terminar</button>`;
+    } else if (!isRunning && prog.status === ProgramStatus.READY) {
+      actionBtnHtml = '<span class="text-muted" style="font-size:0.75rem;">Inicia la simulación para asignar</span>';
     }
 
     item.innerHTML = `
@@ -113,6 +122,7 @@ export function renderApp(state, store) {
   elements.metricFreeCount.textContent = `${metrics.freeBlockCount}`;
   elements.metricResidentCount.textContent = `${metrics.residentProgramCount}`;
   elements.metricProbes.textContent = `${metrics.lastProbeCount}`;
+  elements.metricCompactionBytes.textContent = formatBytes(metrics.lastCompactionBytesMoved);
 
   // 6. Renderiza el inspector del bloque seleccionado.
   if (selectedId) {
@@ -140,9 +150,9 @@ export function renderApp(state, store) {
               ${segs
                 .map(
                   s => `
-                <li style="font-size: 0.8rem; background: var(--color-surface-strong); padding: 4px 8px; border-radius: 4px; display: flex; justify-content: space-between;">
-                  <span>${s.name} (${formatBytes(s.sizeBytes)})</span>
-                  <span class="font-mono text-muted">${toHexAddress(s.start)} &mdash; ${toHexAddress(s.end)}</span>
+                <li style="font-size: 0.8rem; background: var(--color-surface-strong); padding: 4px 8px; border-radius: 4px; display: flex; flex-direction: column; gap: 2px;">
+                  <span><strong>${s.name}</strong> (${formatBytes(s.sizeBytes)})</span>
+                  <span class="font-mono text-muted" style="word-break: break-all;">${toHexAddress(s.start)} — ${toHexAddress(s.end)}</span>
                 </li>
               `
                 )

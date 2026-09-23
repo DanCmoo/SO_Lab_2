@@ -41,7 +41,6 @@
       <div class="header-actions">
         <button id="btn-start-sim" class="btn-primary" type="button">Iniciar simulación</button>
         <button id="btn-undo" type="button" disabled title="Deshacer el último cambio (Ctrl+Z)">Deshacer</button>
-        <button id="btn-compact-top" type="button" disabled title="Compactar memoria en modo dinámico">Compactar</button>
         <button id="btn-compare" type="button" title="Comparar primer, mejor y peor ajuste">Comparar</button>
         <button id="btn-export-scenario" type="button" title="Exportar el estado actual a JSON">Exportar</button>
         <button id="btn-import-scenario" type="button" title="Importar un escenario desde JSON">Importar</button>
@@ -200,6 +199,10 @@
             <span class="metric-label">Últimas inspecciones</span>
             <span class="metric-value" id="metric-probes">0</span>
           </div>
+          <div class="metric-box">
+            <span class="metric-label">Bytes desplazados (última compactación)</span>
+            <span class="metric-value" id="metric-compaction-bytes">0 B</span>
+          </div>
         </div>
       </section>
 
@@ -247,23 +250,6 @@
         <button id="btn-save-custom-prog" class="btn-primary" type="button">Añadir a la cola</button>
       </div>
     </form>
-  </dialog>
-
-  <!-- Compaction Preview Modal -->
-  <dialog id="dialog-compact-preview">
-    <div class="dialog-header">
-      <h3>Vista previa de compactación de memoria</h3>
-      <button class="btn-sm btn-close-dialog" type="button" aria-label="Close dialog">&times;</button>
-    </div>
-    <div>
-      <p style="margin-bottom: 12px;">Los procesos se reubicarán hacia direcciones inferiores según su orden físico:</p>
-      <div id="compact-preview-list" style="max-height: 250px; overflow-y: auto; margin-bottom: 12px;"></div>
-      <p style="font-weight: 600;">Memoria total desplazada: <span id="txt-compact-bytes" class="font-mono">0 B</span></p>
-    </div>
-    <div class="dialog-actions">
-      <button class="btn-close-dialog" type="button">Cancelar</button>
-      <button id="btn-confirm-compaction" class="btn-primary" type="button">Ejecutar compactación</button>
-    </div>
   </dialog>
 
   <!-- Compare Algorithms Modal -->

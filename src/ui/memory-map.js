@@ -126,17 +126,24 @@ export function renderMemoryMap(state, onSelectBlock) {
         segmentsWrapper.appendChild(segSlice);
       }
 
-      // Si una partición ocupada tiene fragmentación interna, añade una sección para ella.
-      if (internalFragBytes > 0) {
-        const fragSlice = document.createElement('div');
-        fragSlice.className = 'internal-frag-slice';
-        fragSlice.style.flex = `${internalFragBytes}`;
-        fragSlice.textContent = `Frag. interna: ${formatBytes(internalFragBytes)}`;
-        fragSlice.title = `Espacio sin usar dentro de la partición: ${formatBytes(internalFragBytes)}`;
-        segmentsWrapper.appendChild(fragSlice);
-      }
-
       card.appendChild(segmentsWrapper);
+
+      // La fragmentación interna no es un segmento del programa. Se muestra en su propia fila
+      // para que no compita por el ancho ni se solape con las etiquetas de los segmentos.
+      if (internalFragBytes > 0) {
+        const fragNote = document.createElement('div');
+        fragNote.className = 'internal-frag-note';
+        fragNote.title = `Espacio sin usar dentro de la partición: ${formatBytes(internalFragBytes)}`;
+
+        const label = document.createElement('span');
+        label.textContent = 'Fragmentación interna';
+        const value = document.createElement('span');
+        value.className = 'font-mono';
+        value.textContent = formatBytes(internalFragBytes);
+
+        fragNote.append(label, value);
+        card.appendChild(fragNote);
+      }
     }
 
     card.addEventListener('click', () => onSelectBlock(block.id));

@@ -1,10 +1,9 @@
 import { MemoryMode, MIB } from '../domain/constants.js';
-import { parseUnitToBytes } from '../domain/address.js';
+import { parseUnitToBytes, formatBytes } from '../domain/address.js';
 import { elements } from './elements.js';
 import {
   openModal,
   closeModal,
-  openCompactionPreview,
   openAlgorithmComparison,
   triggerExportScenario
 } from './dialogs.js';
@@ -16,6 +15,7 @@ import {
 } from './forms.js';
 import { setStatusBanner } from './render.js';
 import { announce } from './accessibility.js';
+import { describeError } from './error-messages.js';
 
 /**
  * Construye la configuración de simulación a partir del formulario actual.
@@ -34,12 +34,15 @@ function readConfigFromForm() {
   if (mode === MemoryMode.STATIC_EQUAL) {
     equalPartitionCount = parseInt(elements.inputEqualCount.value, 10);
   } else if (mode === MemoryMode.STATIC_UNEQUAL) {
-    const rawSizes = elements.inputUnequalSizes.value;
-    unequalPartitionSizes = rawSizes
+    const rawTokens = elements.inputUnequalSizes.value
       .split(',')
-      .map(s => parseFloat(s.trim()))
-      .filter(n => !isNaN(n))
-      .map(n => Math.round(n * MIB));
+      .map(s => s.trim())
+      .filter(Boolean);
+    const sizesInMiB = rawTokens.map(Number);
+    if (sizesInMiB.some(size => !Number.isFinite(size))) {
+      throw new Error('Valor no numérico en "Tamaños desiguales": revisa la lista separada por comas.');
+    }
+    unequalPartitionSizes = sizesInMiB.map(size => Math.round(size * MIB));
   }
 
   return {
@@ -68,15 +71,22 @@ export function initEvents(store) {
         openModal(elements.dialogConfirmReset);
       } catch (error) {
         elements.selectMode.value = state.config.mode;
-        alert(`Error de configuración: ${error.message}`);
+        setStatusBanner({ type: 'error', message: `No se puede cambiar el modo: ${describeError(error)}` });
       }
       return;
     }
     try {
       const config = readConfigFromForm();
-      store.dispatch({ type: 'RESET', config });
-    } catch (e) {
-      alert(e.message);
+      const res = store.dispatch({ type: 'RESET', config });
+      if (res.ok) {
+        setStatusBanner({ type: 'success', message: 'Configuración aplicada.' });
+      } else {
+        elements.selectMode.value = state.config.mode;
+        setStatusBanner({ type: 'error', message: `Configuración inválida: ${describeError(res)}` });
+      }
+    } catch (error) {
+      elements.selectMode.value = state.config.mode;
+      setStatusBanner({ type: 'error', message: `Configuración inválida: ${describeError(error)}` });
     }
   });
 
@@ -97,13 +107,17 @@ export function initEvents(store) {
   elements.btnApplyConfig.addEventListener('click', () => {
     try {
       const config = readConfigFromForm();
-      store.dispatch({ type: 'RESET', config });
-      setStatusBanner({
-        type: 'success',
-        message: 'Configuración aplicada al mapa de memoria física.'
-      });
-    } catch (e) {
-      alert(`Error de configuración: ${e.message}`);
+      const res = store.dispatch({ type: 'RESET', config });
+      if (res.ok) {
+        setStatusBanner({
+          type: 'success',
+          message: 'Configuración aplicada al mapa de memoria física.'
+        });
+      } else {
+        setStatusBanner({ type: 'error', message: `Configuración inválida: ${describeError(res)}` });
+      }
+    } catch (error) {
+      setStatusBanner({ type: 'error', message: `Configuración inválida: ${describeError(error)}` });
     }
   });
 
@@ -118,10 +132,10 @@ export function initEvents(store) {
         });
         announce('Simulación iniciada. Configuración bloqueada.');
       } else {
-        alert(res.details?.error || res.code);
+        setStatusBanner({ type: 'error', message: `No se puede iniciar la simulación: ${describeError(res)}` });
       }
     } catch (e) {
-      alert(`No se puede iniciar la simulación: ${e.message}`);
+      setStatusBanner({ type: 'error', message: `No se puede iniciar la simulación: ${describeError(e)}` });
     }
   });
 
@@ -132,20 +146,6 @@ export function initEvents(store) {
       setStatusBanner({ type: 'success', message: 'Se deshizo la última acción.' });
       announce('Deshacer realizado correctamente.');
     }
-  });
-
-  elements.btnCompactTop.addEventListener('click', () => {
-    const state = store.getState();
-    openCompactionPreview(state, () => {
-      const res = store.dispatch({ type: 'COMPACT_MEMORY' });
-      if (res.ok) {
-        setStatusBanner({
-          type: 'success',
-          message: `Compactación completada. Se desplazaron ${res.details.bytesMoved} bytes.`
-        });
-        announce('Memoria compactada correctamente.');
-      }
-    });
   });
 
   elements.btnCompare.addEventListener('click', () => {
@@ -170,7 +170,7 @@ export function initEvents(store) {
       setStatusBanner({ type: 'success', message: 'Escenario importado correctamente.' });
       announce('Escenario importado correctamente.');
     } else {
-      alert(`Error de importación: ${res.details?.error || res.code}`);
+      setStatusBanner({ type: 'error', message: `Error de importación: ${describeError(res)}` });
     }
   });
 
@@ -183,18 +183,30 @@ export function initEvents(store) {
     closeModal(elements.dialogConfirmReset);
     const config = pendingResetConfig;
     pendingResetConfig = null;
-    store.dispatch(config ? { type: 'RESET', config } : { type: 'RESET' });
-    setStatusBanner({
-      type: 'success',
-      message: 'Simulación reiniciada. Configuración desbloqueada.'
-    });
-    announce('Simulación reiniciada.');
+    const res = store.dispatch(config ? { type: 'RESET', config } : { type: 'RESET' });
+    if (res.ok) {
+      setStatusBanner({
+        type: 'success',
+        message: 'Simulación reiniciada. Configuración desbloqueada.'
+      });
+      announce('Simulación reiniciada.');
+    } else {
+      elements.selectMode.value = store.getState().config.mode;
+      setStatusBanner({ type: 'error', message: `No se pudo reiniciar: ${describeError(res)}` });
+      announce('No se pudo reiniciar: configuración inválida.');
+    }
   });
 
   // 4. Queue Panel & Program Creation
   elements.btnRestoreDefaults.addEventListener('click', () => {
-    store.dispatch({ type: 'RESTORE_DEFAULT_PROGRAMS' });
-    setStatusBanner({ type: 'success', message: 'Programas predeterminados restaurados.' });
+    const res = store.dispatch({ type: 'RESTORE_DEFAULT_PROGRAMS' });
+    if (res.ok) {
+      setStatusBanner({ type: 'success', message: 'Programas predeterminados restaurados.' });
+      announce('Programas predeterminados restaurados.');
+    } else {
+      setStatusBanner({ type: 'error', message: `No se pueden restaurar los predeterminados: ${describeError(res)}` });
+      announce('No se pudieron restaurar los programas predeterminados.');
+    }
   });
 
   elements.btnOpenNewProgram.addEventListener('click', () => {
@@ -210,7 +222,11 @@ export function initEvents(store) {
     try {
       const draft = getCustomProgramDraft();
       if (!draft.name) {
-        alert('Introduce un nombre válido para el programa.');
+        setStatusBanner({
+          type: 'error',
+          message: 'No se puede crear el programa: falta el nombre. Introduce un nombre de entre 1 y 60 caracteres.'
+        });
+        announce('No se puede crear el programa: falta el nombre.');
         return;
       }
       const res = store.dispatch({ type: 'CREATE_PROGRAM', payload: draft });
@@ -222,10 +238,10 @@ export function initEvents(store) {
         });
         announce(`Programa ${draft.name} creado`);
       } else {
-        alert(`No se puede crear el programa: ${res.details?.error || res.code}`);
+        setStatusBanner({ type: 'error', message: `No se puede crear el programa: ${describeError(res)}` });
       }
     } catch (e) {
-      alert(`Error al crear el programa: ${e.message}`);
+      setStatusBanner({ type: 'error', message: `No se puede crear el programa: ${describeError(e)}` });
     }
   });
 
@@ -237,44 +253,33 @@ export function initEvents(store) {
       const res = store.dispatch({ type: 'ALLOCATE_PROGRAM', programId: progId });
 
       if (res.ok) {
-        setStatusBanner({
-          type: 'success',
-          message: `Programa ${progId} asignado correctamente.`
-        });
-        announce(`Programa ${progId} asignado`);
-      } else {
-        if (res.code === 'EXTERNAL_FRAGMENTATION') {
+        if (res.details.autoCompacted) {
           setStatusBanner({
-            type: 'warning',
-            message: `Fragmentación externa: la memoria libre total es suficiente, pero ningún hueco individual tiene espacio para ${progId}.`,
-            action: {
-              label: 'Compactar y reintentar',
-              primary: true,
-              onClick: () => {
-                const retryRes = store.dispatch({
-                  type: 'COMPACT_AND_RETRY',
-                  programId: progId
-                });
-                if (retryRes.ok) {
-                  setStatusBanner({
-                    type: 'success',
-                    message: `Memoria compactada y programa ${progId} asignado correctamente.`
-                  });
-                  announce(`Memoria compactada y programa ${progId} asignado`);
-                } else {
-                  alert(`Error al reintentar: ${retryRes.details?.error || retryRes.code}`);
-                }
-              }
-            }
+            type: 'success',
+            message: `Fragmentación externa detectada: la memoria se compactó automáticamente (se desplazaron ${formatBytes(res.details.compactionBytesMoved)}) y ${progId} quedó asignado.`
           });
-          announce(`Fragmentación externa para el programa ${progId}`);
+          announce(`Memoria compactada automáticamente. Programa ${progId} asignado.`);
         } else {
           setStatusBanner({
-            type: 'error',
-            message: `La asignación de ${progId} falló: ${res.details?.error || res.code}`
+            type: 'success',
+            message: `Programa ${progId} asignado correctamente.`
           });
-          announce(`La asignación de ${progId} falló`);
+          announce(`Programa ${progId} asignado`);
         }
+      } else if (res.code === 'EXTERNAL_FRAGMENTATION') {
+        // Solo puede ocurrir en DYNAMIC_NO_COMPACTION: es un fallo permanente y real,
+        // por diseño ese modo no compacta. No se ofrece ninguna acción de reintento manual.
+        setStatusBanner({
+          type: 'warning',
+          message: `Fragmentación externa: la memoria libre total es suficiente, pero ningún hueco individual tiene espacio para ${progId}. Este modo no compacta memoria.`
+        });
+        announce(`Fragmentación externa para el programa ${progId}`);
+      } else {
+        setStatusBanner({
+          type: 'error',
+          message: `La asignación de ${progId} falló: ${describeError(res, { programId: progId })}`
+        });
+        announce(`La asignación de ${progId} falló`);
       }
       return;
     }
@@ -290,7 +295,7 @@ export function initEvents(store) {
         });
         announce(`Programa ${progId} terminado`);
       } else {
-        alert(`No se puede terminar: ${res.details?.error || res.code}`);
+        setStatusBanner({ type: 'error', message: `No se puede terminar ${progId}: ${describeError(res, { programId: progId })}` });
       }
     }
   });

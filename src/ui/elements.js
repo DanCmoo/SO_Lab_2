@@ -7,7 +7,6 @@ export const elements = {
   selectAlgorithm: document.getElementById('select-algorithm'),
   btnStartSim: document.getElementById('btn-start-sim'),
   btnUndo: document.getElementById('btn-undo'),
-  btnCompactTop: document.getElementById('btn-compact-top'),
   btnCompare: document.getElementById('btn-compare'),
   btnExportScenario: document.getElementById('btn-export-scenario'),
   btnImportScenario: document.getElementById('btn-import-scenario'),
@@ -50,6 +49,7 @@ export const elements = {
   metricFreeCount: document.getElementById('metric-free-count'),
   metricResidentCount: document.getElementById('metric-resident-count'),
   metricProbes: document.getElementById('metric-probes'),
+  metricCompactionBytes: document.getElementById('metric-compaction-bytes'),
 
   // Inspector
   inspectorContent: document.getElementById('inspector-content'),
@@ -61,11 +61,6 @@ export const elements = {
   btnAddSegmentRow: document.getElementById('btn-add-segment-row'),
   txtCalcProgSize: document.getElementById('txt-calc-prog-size'),
   btnSaveCustomProg: document.getElementById('btn-save-custom-prog'),
-
-  dialogCompactPreview: document.getElementById('dialog-compact-preview'),
-  compactPreviewList: document.getElementById('compact-preview-list'),
-  txtCompactBytes: document.getElementById('txt-compact-bytes'),
-  btnConfirmCompaction: document.getElementById('btn-confirm-compaction'),
 
   dialogCompare: document.getElementById('dialog-compare'),
   compareModalContent: document.getElementById('compare-modal-content'),

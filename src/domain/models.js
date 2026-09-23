@@ -310,6 +310,7 @@ export function createInitialState(configOverrides = {}, initialPrograms = []) {
     blocks: Object.freeze(blocks),
     nextSequence: 1,
     selectedId: null,
-    lastTrace: null
+    lastTrace: null,
+    lastCompaction: null
   });
 }

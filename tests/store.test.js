@@ -64,6 +64,32 @@ test('Store & Commands: reset applies a new configuration and reinitializes memo
   assert.equal(store.getState().programs.find(p => p.id === 'P1').status, 'ready');
 });
 
+test('Store & Commands: starting normalizes programs that were allocated before the simulation phase', () => {
+  const initialState = createInitialState({ mode: MemoryMode.STATIC_EQUAL }, getDefaultPrograms());
+  const store = createStore(initialState, reduceCommand);
+
+  assert.equal(store.dispatch({ type: 'ALLOCATE_PROGRAM', programId: 'P1' }).ok, true);
+  const started = store.dispatch({ type: 'START_SIMULATION' });
+
+  assert.equal(started.ok, true);
+  assert.equal(store.getState().phase, 'RUNNING');
+  assert.equal(store.getState().programs.find(p => p.id === 'P1').status, 'ready');
+  assert.equal(store.getState().programs.find(p => p.id === 'P1').start, null);
+  assert.equal(store.getState().partitions.every(partition => partition.programId === null), true);
+});
+
+test('Store & Commands: restoring defaults is rejected while programs are allocated', () => {
+  const initialState = createInitialState({ mode: MemoryMode.STATIC_EQUAL }, getDefaultPrograms());
+  const store = createStore(initialState, reduceCommand);
+  assert.equal(store.dispatch({ type: 'ALLOCATE_PROGRAM', programId: 'P1' }).ok, true);
+
+  const result = store.dispatch({ type: 'RESTORE_DEFAULT_PROGRAMS' });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'INVALID_CONFIGURATION');
+  assert.equal(store.getState().programs.find(p => p.id === 'P1').status, 'allocated');
+});
+
 test('Persistence: Scenario export and import integrity', () => {
   const programs = getDefaultPrograms();
   const state = createInitialState({ mode: MemoryMode.STATIC_UNEQUAL }, programs);

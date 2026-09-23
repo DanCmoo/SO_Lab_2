@@ -1,4 +1,5 @@
 import { MemoryMode } from '../domain/constants.js';
+import { ErrorCode } from '../domain/errors.js';
 import { allocateStaticEqual, terminateStatic } from './static-equal.js';
 import { allocateStaticUnequal } from './static-unequal.js';
 import { allocateDynamic, terminateDynamic } from './dynamic.js';
@@ -6,6 +7,8 @@ import { compactMemory } from './compaction.js';
 
 /**
  * Fachada unificada para asignar un programa en cualquier modo de gestión de memoria.
+ * En modo DYNAMIC_COMPACTION, compacta automáticamente si se detecta fragmentación externa
+ * y reintenta la asignación en la misma transacción.
  *
  * @param {import('../domain/constants.js').SimulationState} state
  * @param {string} programId
@@ -14,7 +17,10 @@ import { compactMemory } from './compaction.js';
  *   state: import('../domain/constants.js').SimulationState,
  *   partitionId?: string,
  *   internalFragmentationBytes?: number,
- *   trace: import('./allocators.js').AllocationTrace
+ *   trace: import('./allocators.js').AllocationTrace,
+ *   autoCompacted?: boolean,
+ *   compactionBytesMoved?: number,
+ *   compactionRelocations?: Array
  * }}
  */
 export function allocate(state, programId, algorithmOverride) {
@@ -28,7 +34,38 @@ export function allocate(state, programId, algorithmOverride) {
     return allocateStaticUnequal(state, programId, algorithmOverride);
   }
 
-  // DYNAMIC_NO_COMPACTION o DYNAMIC_COMPACTION.
+  if (mode === MemoryMode.DYNAMIC_COMPACTION) {
+    try {
+      return allocateDynamic(state, programId, algorithmOverride);
+    } catch (error) {
+      if (error.code !== ErrorCode.EXTERNAL_FRAGMENTATION) {
+        throw error; // INSUFFICIENT_TOTAL_MEMORY u otro error real: no se puede resolver compactando.
+      }
+
+      // --- Comportamiento clásico de SO ---
+      // El gestor de memoria compacta automáticamente ante fragmentación externa
+      // y reintenta la asignación dentro de la misma transacción.
+      const compaction = compactMemory(state);
+      const retry = allocateDynamic(compaction.state, programId, algorithmOverride);
+
+      return {
+        ...retry,
+        state: {
+          ...retry.state,
+          lastCompaction: {
+            bytesMoved: compaction.bytesMoved,
+            relocations: compaction.relocations,
+            triggeredByProgramId: programId
+          }
+        },
+        autoCompacted: true,
+        compactionBytesMoved: compaction.bytesMoved,
+        compactionRelocations: compaction.relocations
+      };
+    }
+  }
+
+  // DYNAMIC_NO_COMPACTION: la fragmentación externa es un fallo permanente por diseño.
   return allocateDynamic(state, programId, algorithmOverride);
 }
 

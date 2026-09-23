@@ -7,7 +7,7 @@
 
 ## 1. Product Definition
 
-The product is an educational browser application that simulates contiguous memory allocation in a multiprogrammed system. It must let users configure memory, load and terminate programs, visualize physical addresses and internal program segments, compare allocation algorithms, observe internal and external fragmentation, and compact memory where supported.
+The product is an educational browser application that simulates contiguous memory allocation in a multiprogrammed system. It must let users configure memory, load and terminate programs, visualize physical addresses and internal program segments, compare allocation algorithms, and observe internal and external fragmentation. In dynamic-compaction mode, compaction is performed automatically as part of an allocation when required.
 
 The implementation must use Vanilla JavaScript, HTML, and CSS without a frontend framework or backend service.
 
@@ -39,8 +39,8 @@ Because no configuration choices were confirmed, version 1.0 uses these defaults
 - The OS reservation is editable before a simulation starts, from 0 bytes up to less than 16 MiB.
 - Programs are allocated contiguously by total size.
 - Program segments are informational subdivisions inside the program's contiguous allocation.
-- Program operations are manual and step-based: create, enqueue, allocate, terminate, compact, undo, and reset.
-- Compaction is manual. The application never moves processes without an explicit user action.
+- Program operations are manual and step-based: create, enqueue, allocate, terminate, undo, and reset.
+- In `DYNAMIC_COMPACTION`, an allocation that fails solely because of external fragmentation compacts and retries within the same transaction. The application reports this automatic relocation to the user.
 - All calculations use bytes internally. The UI accepts bytes, KiB, and MiB.
 - Changing the memory-management mode or partition layout requires a reset confirmation.
 
@@ -96,11 +96,10 @@ The mode selector must expose exactly these options:
 ### 6.4 Dynamic partitions — with compaction
 
 - Allocation and termination behavior is identical to dynamic partitions without compaction.
-- A **Compact memory** action must be available after at least two separated holes exist.
-- Compaction moves allocated processes toward the lowest available user-memory address while preserving their current address order.
-- Compaction creates one free hole at the high-address end of memory.
-- If allocation fails because the largest hole is too small but total free memory is sufficient, the UI must identify external fragmentation and offer **Compact and retry**.
-- Compaction must produce a history event showing every relocated process and its previous and new address range.
+- If allocation fails because the largest hole is too small but total free memory is sufficient, the allocation transaction automatically compacts memory and retries.
+- Automatic compaction moves allocated processes toward the lowest available user-memory address while preserving their current address order, then creates one free hole at the high-address end of memory.
+- The successful allocation exposes its relocated processes, moved bytes, and triggering program through its result details; the UI reports the event and displays the bytes moved by the latest compaction.
+- Undo treats automatic compaction and its triggering allocation as one state change.
 
 ## 7. Allocation Algorithms
 
@@ -194,15 +193,14 @@ The application may provide additional presets, but these five must always be av
 4. Dynamic mode converts its allocation into a hole and merges adjacent holes.
 5. Metrics and history update.
 
-### 9.5 Compact memory
+### 9.5 Automatic compaction during allocation
 
-1. User selects **Compact memory**.
-2. The application previews which processes will move.
-3. User confirms the operation.
-4. Allocated processes move toward the OS boundary in physical-address order.
-5. Segment offsets inside each process remain unchanged.
-6. One final free hole is created.
-7. Relocations and updated metrics appear in history.
+1. User selects **Allocate** for a ready program.
+2. If no individual hole is large enough but total free memory is sufficient, the simulator detects external fragmentation.
+3. Within that same allocation transaction, allocated processes move toward the OS boundary in physical-address order and segment offsets remain unchanged.
+4. The simulator retries the allocation against the single final hole.
+5. The UI confirms the successful allocation and reports the bytes moved.
+6. One undo operation restores the exact pre-allocation fragmented layout.
 
 ### 9.6 Compare algorithms
 
@@ -264,7 +262,7 @@ Every operation must produce a clear status message:
 - Partition or hole selected by the active algorithm.
 - Process terminated.
 - Adjacent holes merged.
-- Memory compacted.
+- Memory compacted automatically during allocation, including bytes moved and the allocated program.
 - Invalid configuration or input.
 
 Messages must include the relevant program, requested size, algorithm, and candidate or failure reason.
@@ -312,7 +310,7 @@ For dynamic modes, internal fragmentation is zero under the simplified byte-exac
 - Duplicate program display names are allowed; IDs remain unique.
 - Allocating an already allocated or terminated program must be prevented.
 - Terminating a non-resident program must be prevented.
-- Compacting with zero or one hole must be disabled.
+- No manual compaction control may be exposed. Automatic compaction is attempted only by an allocation in `DYNAMIC_COMPACTION` after external fragmentation is detected.
 
 ## 14. History and Undo
 

@@ -1,5 +1,4 @@
 import { toHexAddress, formatBytes } from '../domain/address.js';
-import { compactMemory, canCompactMemory } from '../engine/compaction.js';
 import { compareAlgorithms } from '../engine/comparison.js';
 import { exportScenario } from '../state/persistence.js';
 import { MemoryMode } from '../domain/constants.js';
@@ -27,57 +26,6 @@ export function closeModal(dialog) {
   } else if (dialog) {
     dialog.removeAttribute('open');
   }
-}
-
-/**
- * Abre y renderiza el diálogo de vista previa de compactación.
- *
- * @param {import('../domain/constants.js').SimulationState} state
- * @param {() => void} onConfirm
- */
-export function openCompactionPreview(state, onConfirm) {
-  const check = canCompactMemory(state);
-  if (!check.canCompact) {
-    alert(check.reason || 'No se puede realizar la compactación.');
-    return;
-  }
-
-  const { relocations, bytesMoved } = compactMemory(state);
-
-  elements.compactPreviewList.innerHTML = '';
-  if (relocations.length === 0) {
-    elements.compactPreviewList.innerHTML = '<p class="text-muted">No es necesario reubicar procesos.</p>';
-  } else {
-    const list = document.createElement('ul');
-    list.style.listStyle = 'none';
-    list.style.display = 'flex';
-    list.style.flexDirection = 'column';
-    list.style.gap = '8px';
-
-    for (const rel of relocations) {
-      const item = document.createElement('li');
-      item.style.padding = '8px';
-      item.style.border = '1px solid var(--color-border)';
-      item.style.borderRadius = 'var(--radius-sm)';
-      item.style.backgroundColor = 'var(--color-surface-strong)';
-      item.innerHTML = `
-        <strong>${rel.programName} (${rel.programId})</strong> [${formatBytes(rel.sizeBytes)}]<br>
-        <span class="font-mono text-muted">${toHexAddress(rel.oldStart)} &rarr; ${toHexAddress(rel.newStart)}</span>
-      `;
-      list.appendChild(item);
-    }
-    elements.compactPreviewList.appendChild(list);
-  }
-
-  elements.txtCompactBytes.textContent = formatBytes(bytesMoved);
-
-  // Configura el controlador de confirmación de un solo uso.
-  elements.btnConfirmCompaction.onclick = () => {
-    closeModal(elements.dialogCompactPreview);
-    onConfirm();
-  };
-
-  openModal(elements.dialogCompactPreview);
 }
 
 /**

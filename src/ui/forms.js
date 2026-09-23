@@ -71,7 +71,13 @@ export function recalculateConfigValues() {
     }
   } else if (mode === MemoryMode.STATIC_UNEQUAL) {
     const sizesStr = elements.inputUnequalSizes.value;
-    const parts = sizesStr.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
+    const rawTokens = sizesStr.split(',').map(s => s.trim()).filter(Boolean);
+    const parts = rawTokens.map(Number);
+    if (parts.some(size => !Number.isFinite(size))) {
+      elements.txtUnequalCalc.textContent = 'No válido: introduce únicamente números separados por comas.';
+      elements.txtUnequalCalc.style.color = 'var(--color-danger)';
+      return;
+    }
     const totalMiB = parts.reduce((acc, v) => acc + v, 0);
     const totalBytes = totalMiB * MIB;
     elements.txtUnequalCalc.textContent = `Suma: ${totalMiB} MiB / ${userBytes / MIB} MiB de memoria de usuario`;

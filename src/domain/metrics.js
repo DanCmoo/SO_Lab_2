@@ -76,6 +76,7 @@ export function deriveMetrics(state) {
     userBytes > 0 ? parseFloat(((allocatedProgramBytes / userBytes) * 100).toFixed(2)) : 0;
 
   const lastProbeCount = state.lastTrace ? state.lastTrace.probes : 0;
+  const lastCompactionBytesMoved = state.lastCompaction ? state.lastCompaction.bytesMoved : 0;
 
   return {
     totalMemoryBytes,
@@ -90,6 +91,6 @@ export function deriveMetrics(state) {
     residentProgramCount,
     utilizationPercent,
     lastProbeCount,
-    lastCompactionBytesMoved: 0
+    lastCompactionBytesMoved
   };
 }
