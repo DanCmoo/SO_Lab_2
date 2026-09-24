@@ -1,4 +1,4 @@
-import { MemoryMode, MIB } from '../domain/constants.js';
+import { MemoryMode, MIB, TOTAL_MEMORY_BYTES } from '../domain/constants.js';
 import { parseUnitToBytes, formatBytes } from '../domain/address.js';
 import { elements } from './elements.js';
 import {
@@ -15,6 +15,53 @@ import {
 import { setStatusBanner } from './render.js';
 import { announce } from './accessibility.js';
 import { describeError } from './error-messages.js';
+
+function availableUserBytes() {
+  return parseUnitToBytes(elements.inputOsSize.value, elements.selectOsUnit.value);
+}
+
+function fitPartitionInputsToMemory() {
+  let userBytes;
+  try {
+    userBytes = TOTAL_MEMORY_BYTES - availableUserBytes();
+  } catch (_error) {
+    return;
+  }
+  if (userBytes <= 0) return;
+
+  if (elements.selectMode.value === MemoryMode.STATIC_EQUAL) {
+    let count = Number.parseInt(elements.inputEqualCount.value, 10);
+    if (!Number.isSafeInteger(count) || count < 1) count = 1;
+    count = Math.min(count, userBytes);
+    while (userBytes % count !== 0) count -= 1;
+    elements.inputEqualCount.value = String(count);
+  } else if (elements.selectMode.value === MemoryMode.STATIC_UNEQUAL) {
+    const tokens = elements.inputUnequalSizes.value.split(',').map(value => value.trim()).filter(Boolean);
+    const parsed = tokens.map(value => Number(value));
+    if (!parsed.length || parsed.some(value => !Number.isFinite(value) || value <= 0)) {
+      elements.inputUnequalSizes.value = `${userBytes / MIB}`;
+      return;
+    }
+
+    const oldBytes = parsed.map(value => Math.round(value * MIB));
+    const oldTotal = oldBytes.reduce((sum, value) => sum + value, 0);
+    if (oldBytes.some(value => value <= 0) || oldTotal <= 0) {
+      elements.inputUnequalSizes.value = `${userBytes / MIB}`;
+      return;
+    }
+    if (oldTotal === userBytes) return;
+    const count = Math.min(oldBytes.length, userBytes);
+    const weights = oldBytes.slice(0, count);
+    const weightTotal = weights.reduce((sum, value) => sum + value, 0);
+    const sizes = weights.map(value => Math.max(1, Math.floor(userBytes * value / weightTotal)));
+    let delta = userBytes - sizes.reduce((sum, value) => sum + value, 0);
+    for (let i = sizes.length - 1; delta !== 0; i = (i + sizes.length - 1) % sizes.length) {
+      if (delta > 0) { sizes[i] += 1; delta -= 1; }
+      else if (sizes[i] > 1) { sizes[i] -= 1; delta += 1; }
+    }
+    elements.inputUnequalSizes.value = sizes.map(bytes => String(bytes / MIB)).join(', ');
+  }
+}
 
 /**
  * Construye la configuración de simulación a partir del formulario actual.
@@ -74,6 +121,8 @@ export function initEvents(store) {
       }
       return;
     }
+    fitPartitionInputsToMemory();
+    recalculateConfigValues();
     try {
       const config = readConfigFromForm();
       const res = store.dispatch({ type: 'RESET', config });
@@ -97,8 +146,8 @@ export function initEvents(store) {
   });
 
   // Live calculation on config input changes
-  elements.inputOsSize.addEventListener('input', recalculateConfigValues);
-  elements.selectOsUnit.addEventListener('change', recalculateConfigValues);
+  elements.inputOsSize.addEventListener('input', () => { fitPartitionInputsToMemory(); recalculateConfigValues(); });
+  elements.selectOsUnit.addEventListener('change', () => { fitPartitionInputsToMemory(); recalculateConfigValues(); });
   elements.inputEqualCount.addEventListener('input', recalculateConfigValues);
   elements.inputUnequalSizes.addEventListener('input', recalculateConfigValues);
 
