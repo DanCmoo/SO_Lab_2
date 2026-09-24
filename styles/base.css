@@ -5,8 +5,8 @@
 }
 
 html {
-  font-size: 15px;
-  line-height: 1.5;
+  font-size: 12px;
+  line-height: 1.45;
   -webkit-text-size-adjust: 100%;
 }
 
@@ -32,8 +32,8 @@ code, kbd, samp, pre, .font-mono {
 
 /* Accessibility Focus States */
 :focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
+  outline: 1px solid var(--color-primary);
+  outline-offset: 1px;
 }
 
 button, input, select, textarea {
@@ -46,14 +46,13 @@ button {
   border: 1px solid var(--color-border);
   background: var(--color-surface);
   border-radius: var(--radius-sm);
-  padding: var(--space-2) var(--space-3);
+  padding: 4px 10px;
   font-weight: 500;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition: filter 0.12s ease, background-color 0.12s ease, border-color 0.12s ease;
 }
 
 button:hover:not(:disabled) {
-  background: var(--color-surface-strong);
-  border-color: var(--color-primary);
+  filter: brightness(1.15);
 }
 
 button:disabled {
@@ -67,12 +66,19 @@ select {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  padding: var(--space-2) var(--space-3);
+  padding: 4px 8px;
 }
 
 input:focus, select:focus {
   border-color: var(--color-primary);
+  outline: 0;
+  box-shadow: 0 0 0 3px rgba(56,139,253,.12);
 }
+
+.font-mono, code, kbd, samp, pre, input[type="number"], .metric-value,
+.block-range, .segment-slice, .queue-item-sub { font-variant-numeric: tabular-nums; }
+
+::selection { background: rgba(56,139,253,.25); color: var(--color-text); }
 
 .sr-only {
   position: absolute;

@@ -1,7 +1,5 @@
 import { toHexAddress, formatBytes } from '../domain/address.js';
 import { compareAlgorithms } from '../engine/comparison.js';
-import { exportScenario } from '../state/persistence.js';
-import { MemoryMode } from '../domain/constants.js';
 import { elements } from './elements.js';
 
 /**
@@ -35,21 +33,10 @@ export function closeModal(dialog) {
  */
 export function openAlgorithmComparison(state) {
   const comparisonResults = compareAlgorithms(state);
-  const isStaticEqual = state.config.mode === MemoryMode.STATIC_EQUAL;
-
-  let noteHtml = '';
-  if (isStaticEqual) {
-    noteHtml = `
-      <div class="alert-banner alert-warning" style="margin-bottom: 16px;">
-        Nota: con particiones estáticas iguales, todos los algoritmos seleccionan la partición libre de menor dirección y producen asignaciones idénticas.
-      </div>
-    `;
-  }
 
   const [firstFit, bestFit, worstFit] = comparisonResults;
 
   const tableHtml = `
-    ${noteHtml}
     <div style="overflow-x: auto;">
       <table class="accessible-table" style="width: 100%;">
         <thead>
@@ -110,19 +97,4 @@ export function openAlgorithmComparison(state) {
 
   elements.compareModalContent.innerHTML = tableHtml;
   openModal(elements.dialogCompare);
-}
-
-/**
- * Inicia la descarga del archivo JSON del escenario en el navegador.
- * @param {import('../domain/constants.js').SimulationState} state
- */
-export function triggerExportScenario(state) {
-  const jsonStr = exportScenario(state);
-  const blob = new Blob([jsonStr], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `simulation-scenario-${Date.now()}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
 }

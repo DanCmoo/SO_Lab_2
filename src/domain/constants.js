@@ -7,7 +7,6 @@ export const MAX_ADDRESS = 0xFFFFFF;
 export const DEFAULT_OS_BYTES = 1 * MIB;
 export const STATE_SCHEMA_VERSION = 1;
 export const STORAGE_KEY = 'mms:simulation:v1';
-export const MAX_UNDO_DEPTH = 50;
 
 export const MemoryMode = Object.freeze({
   STATIC_EQUAL: 'STATIC_EQUAL',

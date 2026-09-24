@@ -40,8 +40,6 @@ export function renderApp(state, store) {
     elements.inputUnequalSizes.value = config.unequalPartitionSizes.map(size => size / MIB).join(', ');
   }
 
-  elements.btnUndo.disabled = !store.canUndo();
-
   if (isRunning) {
     elements.btnStartSim.textContent = 'En ejecución';
     elements.btnStartSim.disabled = true;
@@ -176,7 +174,7 @@ export function renderApp(state, store) {
           }
           ${
             internalFrag > 0
-              ? `<div><strong>Fragmentación interna:</strong> <span class="font-mono" style="color: #7A4B24;">${formatBytes(internalFrag)}</span></div>`
+              ? `<div><strong>Fragmentación interna:</strong> <span class="font-mono text-warning">${formatBytes(internalFrag)}</span></div>`
               : ''
           }
           ${segmentsHtml}

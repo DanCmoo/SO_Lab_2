@@ -15,7 +15,7 @@ export function announce(message) {
 }
 
 /**
- * Inicializa los accesos directos globales (por ejemplo, Ctrl+Z para deshacer).
+ * Inicializa los accesos directos globales.
  * @param {import('../state/store.js').createStore} store
  */
 export function initKeyboardShortcuts(store) {
@@ -23,13 +23,6 @@ export function initKeyboardShortcuts(store) {
     // Ignora la combinación al escribir en campos de entrada o áreas de texto.
     if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) {
       return;
-    }
-
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
-      e.preventDefault();
-      if (store.canUndo()) {
-        store.dispatch({ type: 'UNDO' });
-      }
     }
   });
 }

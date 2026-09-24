@@ -3,7 +3,6 @@ import { DomainError, ErrorCode } from '../domain/errors.js';
 import { createProgram, createInitialState, createSimulationConfig } from '../domain/models.js';
 import { getDefaultPrograms } from '../data/default-programs.js';
 import { allocate, terminate } from '../engine/simulator.js';
-import { importScenario } from './persistence.js';
 
 /**
  * Reductor puro que aplica un comando al estado de la simulación.
@@ -142,18 +141,6 @@ export function reduceCommand(state, command) {
           state: newState,
           code: 'DEFAULTS_RESTORED',
           details: { programCount: defaultPrograms.length }
-        };
-      }
-
-      case 'IMPORT_SCENARIO': {
-        const imported = typeof command.payload === 'string'
-          ? importScenario(command.payload)
-          : command.payload;
-        return {
-          ok: true,
-          state: imported,
-          code: 'SCENARIO_IMPORTED',
-          details: { mode: imported.config.mode }
         };
       }
 

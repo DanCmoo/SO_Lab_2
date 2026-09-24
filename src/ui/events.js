@@ -4,8 +4,7 @@ import { elements } from './elements.js';
 import {
   openModal,
   closeModal,
-  openAlgorithmComparison,
-  triggerExportScenario
+  openAlgorithmComparison
 } from './dialogs.js';
 import {
   resetCustomProgramForm,
@@ -140,38 +139,8 @@ export function initEvents(store) {
   });
 
   // 3. Top Action Buttons
-  elements.btnUndo.addEventListener('click', () => {
-    const res = store.dispatch({ type: 'UNDO' });
-    if (res.ok) {
-      setStatusBanner({ type: 'success', message: 'Se deshizo la última acción.' });
-      announce('Deshacer realizado correctamente.');
-    }
-  });
-
   elements.btnCompare.addEventListener('click', () => {
     openAlgorithmComparison(store.getState());
-  });
-
-  elements.btnExportScenario.addEventListener('click', () => {
-    triggerExportScenario(store.getState());
-  });
-
-  elements.btnImportScenario.addEventListener('click', () => {
-    elements.textareaScenarioJson.value = '';
-    openModal(elements.dialogImport);
-  });
-
-  elements.btnConfirmImport.addEventListener('click', () => {
-    const jsonStr = elements.textareaScenarioJson.value.trim();
-    if (!jsonStr) return;
-    const res = store.dispatch({ type: 'IMPORT_SCENARIO', payload: jsonStr });
-    if (res.ok) {
-      closeModal(elements.dialogImport);
-      setStatusBanner({ type: 'success', message: 'Escenario importado correctamente.' });
-      announce('Escenario importado correctamente.');
-    } else {
-      setStatusBanner({ type: 'error', message: `Error de importación: ${describeError(res)}` });
-    }
   });
 
   elements.btnReset.addEventListener('click', () => {
@@ -250,36 +219,37 @@ export function initEvents(store) {
     const allocBtn = e.target.closest('.btn-allocate');
     if (allocBtn) {
       const progId = allocBtn.getAttribute('data-id');
+      const programName = store.getState().programs.find(program => program.id === progId)?.name || progId;
       const res = store.dispatch({ type: 'ALLOCATE_PROGRAM', programId: progId });
 
       if (res.ok) {
         if (res.details.autoCompacted) {
           setStatusBanner({
             type: 'success',
-            message: `Fragmentación externa detectada: la memoria se compactó automáticamente (se desplazaron ${formatBytes(res.details.compactionBytesMoved)}) y ${progId} quedó asignado.`
+            message: `Fragmentación externa detectada: la memoria se compactó automáticamente (se desplazaron ${formatBytes(res.details.compactionBytesMoved)}) y ${programName} quedó asignado.`
           });
-          announce(`Memoria compactada automáticamente. Programa ${progId} asignado.`);
+          announce(`Memoria compactada automáticamente. Programa ${programName} asignado.`);
         } else {
           setStatusBanner({
             type: 'success',
-            message: `Programa ${progId} asignado correctamente.`
+            message: `Programa ${programName} asignado correctamente.`
           });
-          announce(`Programa ${progId} asignado`);
+          announce(`Programa ${programName} asignado`);
         }
       } else if (res.code === 'EXTERNAL_FRAGMENTATION') {
         // Solo puede ocurrir en DYNAMIC_NO_COMPACTION: es un fallo permanente y real,
         // por diseño ese modo no compacta. No se ofrece ninguna acción de reintento manual.
         setStatusBanner({
           type: 'warning',
-          message: `Fragmentación externa: la memoria libre total es suficiente, pero ningún hueco individual tiene espacio para ${progId}. Este modo no compacta memoria.`
+          message: `Fragmentación externa: la memoria libre total es suficiente, pero ningún hueco individual tiene espacio para ${programName}. Este modo no compacta memoria.`
         });
-        announce(`Fragmentación externa para el programa ${progId}`);
+        announce(`Fragmentación externa para el programa ${programName}`);
       } else {
         setStatusBanner({
           type: 'error',
-          message: `La asignación de ${progId} falló: ${describeError(res, { programId: progId })}`
+          message: `La asignación de ${programName} falló: ${describeError(res, { programId: programName })}`
         });
-        announce(`La asignación de ${progId} falló`);
+        announce(`La asignación de ${programName} falló`);
       }
       return;
     }

@@ -6,10 +6,7 @@ export const elements = {
   selectMode: document.getElementById('select-mode'),
   selectAlgorithm: document.getElementById('select-algorithm'),
   btnStartSim: document.getElementById('btn-start-sim'),
-  btnUndo: document.getElementById('btn-undo'),
   btnCompare: document.getElementById('btn-compare'),
-  btnExportScenario: document.getElementById('btn-export-scenario'),
-  btnImportScenario: document.getElementById('btn-import-scenario'),
   btnReset: document.getElementById('btn-reset'),
 
   // Panel de configuración.
@@ -64,10 +61,6 @@ export const elements = {
 
   dialogCompare: document.getElementById('dialog-compare'),
   compareModalContent: document.getElementById('compare-modal-content'),
-
-  dialogImport: document.getElementById('dialog-import'),
-  textareaScenarioJson: document.getElementById('textarea-scenario-json'),
-  btnConfirmImport: document.getElementById('btn-confirm-import'),
 
   dialogConfirmReset: document.getElementById('dialog-confirm-reset'),
   btnConfirmReset: document.getElementById('btn-confirm-reset'),

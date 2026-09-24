@@ -40,10 +40,7 @@
 
       <div class="header-actions">
         <button id="btn-start-sim" class="btn-primary" type="button">Iniciar simulación</button>
-        <button id="btn-undo" type="button" disabled title="Deshacer el último cambio (Ctrl+Z)">Deshacer</button>
         <button id="btn-compare" type="button" title="Comparar primer, mejor y peor ajuste">Comparar</button>
-        <button id="btn-export-scenario" type="button" title="Exportar el estado actual a JSON">Exportar</button>
-        <button id="btn-import-scenario" type="button" title="Importar un escenario desde JSON">Importar</button>
         <button id="btn-reset" class="btn-danger" type="button" title="Reiniciar simulación">Reiniciar</button>
       </div>
     </div>
@@ -263,24 +260,6 @@
     </div>
     <div class="dialog-actions">
       <button class="btn-close-dialog" type="button">Cerrar</button>
-    </div>
-  </dialog>
-
-  <!-- Scenario Import Modal -->
-  <dialog id="dialog-import">
-    <div class="dialog-header">
-      <h3>Importar escenario JSON</h3>
-      <button class="btn-sm btn-close-dialog" type="button" aria-label="Close dialog">&times;</button>
-    </div>
-    <div>
-      <div class="form-field">
-        <label for="textarea-scenario-json">Pega el JSON exportado de la simulación:</label>
-        <textarea id="textarea-scenario-json" rows="10" style="width: 100%; font-family: var(--font-mono); font-size: 0.8rem;"></textarea>
-      </div>
-    </div>
-    <div class="dialog-actions">
-      <button class="btn-close-dialog" type="button">Cancelar</button>
-      <button id="btn-confirm-import" class="btn-primary" type="button">Cargar escenario</button>
     </div>
   </dialog>
 
