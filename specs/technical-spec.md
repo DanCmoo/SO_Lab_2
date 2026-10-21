@@ -118,6 +118,9 @@ The implementation should use JSDoc typedefs and runtime validation.
  * @property {string} name
  * @property {string} colorToken
  * @property {Segment[]} segments
+ * @property {number} imageSizeBytes
+ * @property {{heapBytes:number, stackBytes:number}} runtimeMemory
+ * @property {Array<{id:string, kind:string, name:string, sizeBytes:number, programId:string, allocatedBy:'OS', growth:string}>} runtimeRegions
  * @property {number} sizeBytes
  * @property {ProgramStatus} status
  * @property {number} arrivalOrder
@@ -151,7 +154,8 @@ The implementation should use JSDoc typedefs and runtime validation.
  * @property {AllocationAlgorithm} algorithm
  * @property {number} totalBytes
  * @property {number} osBytes
- * @property {number|null} equalPartitionCount
+ * @property {number|null} equalPartitionSizeBytes
+ * @property {number|null} equalPartitionCount Derived from available memory and partition size
  * @property {number[]} unequalPartitionSizes
  */
 
@@ -167,7 +171,7 @@ The implementation should use JSDoc typedefs and runtime validation.
  * @property {number} nextSequence
  * @property {string|null} selectedId
  * @property {AllocationTrace|null} lastTrace
- * @property {{bytesMoved:number, relocations:Array, triggeredByProgramId:string}|null} lastCompaction
+ * @property {{bytesMoved:number, relocations:Array, triggeredByProgramId:string, trigger:'TERMINATE_PROGRAM'}|null} lastCompaction
  */
 ```
 
@@ -188,7 +192,7 @@ The implementation should use JSDoc typedefs and runtime validation.
 - Sum of block sizes equals `TOTAL_MEMORY_BYTES`.
 - An allocated program appears exactly once in memory.
 - A ready, rejected, or terminated program appears zero times in memory.
-- Program total equals the sum of its segment sizes.
+- Required process size equals image-segment bytes plus heap/stack reservations. Non-resident programs have no allocated runtime regions.
 
 ### 6.2 Static-mode invariants
 
@@ -295,9 +299,10 @@ The production implementation must not sort a cloned candidate array per request
 
 ```text
 userBytes = TOTAL_MEMORY_BYTES - osBytes
-require userBytes mod partitionCount = 0
-partitionSize = userBytes / partitionCount
+require partitionSize > 0 and partitionSize <= userBytes (safe integer bytes)
+partitionCount = floor(userBytes / partitionSize)
 create partitionCount adjacent partitions after the OS block
+represent any remainder as UNPARTITIONED (not allocatable, not a free partition)
 ```
 
 Default:
@@ -441,7 +446,7 @@ Compaction is valid only in `DYNAMIC_COMPACTION` mode.
 ### 13.1 Preconditions
 
 - Simulation phase is `RUNNING`.
-- An `ALLOCATE_PROGRAM` operation in `DYNAMIC_COMPACTION` has received `EXTERNAL_FRAGMENTATION` from the pure dynamic allocator.
+- A `TERMINATE_PROGRAM` operation in `DYNAMIC_COMPACTION` has successfully freed a resident process. If the memory is already packed, record zero moved bytes without calling the relocation algorithm.
 
 ### 13.2 Algorithm
 
@@ -465,22 +470,22 @@ Requirements:
 - Do not change process or segment sizes.
 - Recalculate segment addresses from the new process start.
 - Report `bytesMoved` as the sum of sizes of relocated processes.
-- The public allocation facade catches only `EXTERNAL_FRAGMENTATION`, runs compaction, and retries the allocation in the same call.
-- The resulting state records `lastCompaction` with `bytesMoved`, `relocations`, and `triggeredByProgramId`.
-- The enclosing `ALLOCATE_PROGRAM` is the sole undoable command: undo restores the state before both compaction and allocation.
-- `INSUFFICIENT_TOTAL_MEMORY` and every other failure propagate without compacting.
+- The public termination facade releases memory, then compacts within the same call. Allocation never compacts or relocates existing processes.
+- The resulting state records `lastCompaction` with `bytesMoved`, `relocations`, `triggeredByProgramId` (the terminated process), and `trigger: 'TERMINATE_PROGRAM'`.
+- The enclosing `TERMINATE_PROGRAM` is the sole undoable command: undo restores the process and addresses before termination and compaction.
+- Failed allocations and failed terminations leave the state unchanged.
 
 Complexity is `O(p)`, where `p` is the number of resident processes.
 
 ## 14. Segment Address Derivation
 
-Segments do not participate independently in allocation. After a program receives `[programStart, programEnd]`, segment addresses are derived in declared order.
+Image segments do not participate independently in allocation. `runtimeMemory` is a request for heap/stack capacity; the allocator creates `runtimeRegions` owned by each resident process with `allocatedBy: 'OS'`. They are empty for ready/terminated programs. Required `sizeBytes` equals `imageSizeBytes + heapBytes + stackBytes`. After allocation, image regions are placed first, heap follows, and stack occupies the high end of the process span. Region addresses are derived from the current start, so compaction relocates all regions consistently. This contiguous model fixes reservations upfront; it does not simulate paging, page faults, or changing heap/stack usage.
 
 ```js
 export function layoutSegments(program) {
   if (program.start === null) return [];
   let cursor = program.start;
-  return program.segments.map(segment => {
+  return [...program.segments, ...program.runtimeRegions].map(segment => {
     const placed = {
       ...segment,
       start: cursor,
@@ -499,6 +504,8 @@ lastSegment.end === program.end
 ```
 
 ## 15. Commands and Results
+
+`ALLOCATE_PROGRAM` accepts a catalog ID (no `sourceProgramId`) and always creates a child process, including the first launch: `id = sourceId + '~' + instanceNumber`. Allocation uses the child ID; the catalog entry retains its original status and addresses. After success, `nextInstanceNumber` advances on the catalog record; failure leaves the counter and state unchanged. Only the UI catalog offers **Execute**. Child rows offer only **Terminate**. `TERMINATE_PROGRAM` releases memory, performs mode-specific compaction, then removes the terminated child from `programs`. Undo restores that child and its memory atomically. Persistent counters prevent reuse of removed instance numbers after reload. For compatibility, older resident catalog records keep their memory mappings until terminated, and non-resident children from old sessions are discarded after accounting for their execution numbers.
 
 Supported commands:
 
@@ -590,6 +597,7 @@ Definitions:
 
 - `allocatedProgramBytes`: sum of resident program sizes.
 - `freeBytes`: sum of free partition capacities in static modes; sum of hole sizes in dynamic modes.
+- `unpartitionedBytes`: remainder smaller than a complete equal partition; unavailable for allocation, separate from free bytes and internal fragmentation.
 - `internalFragmentationBytes`: sum of `partition.sizeBytes - program.sizeBytes` for occupied static partitions.
 - `largestFreeBlockBytes`: largest free partition or hole.
 - `freeBlockCount`: free partitions or holes.
@@ -637,7 +645,7 @@ Exported scenario:
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "exportedAt": "ISO-8601 timestamp",
   "config": {},
   "programs": [],
@@ -653,6 +661,8 @@ Import procedure:
 4. Recompute derived fields such as totals and end addresses rather than trusting imported values.
 5. Run `assertState`.
 6. Replace active state only after complete validation.
+
+Schema version 2 stores equal partition size and runtime requests separately from image segments. Loading a version 1 session converts the old partition count into its original size and converts Heap/Stack image entries into OS runtime requests, preserving physical addresses and unequal-partition order.
 
 ## 21. UI Architecture
 
@@ -724,50 +734,47 @@ export const DEFAULT_PROGRAMS = [
     id: 'P1', name: 'Compiler',
     segments: [
       { id: 'P1-CODE', name: 'Code', sizeBytes: 768 * KIB },
-      { id: 'P1-DATA', name: 'Data', sizeBytes: 512 * KIB },
-      { id: 'P1-HEAP', name: 'Heap', sizeBytes: 512 * KIB },
-      { id: 'P1-STACK', name: 'Stack', sizeBytes: 256 * KIB }
-    ]
+      { id: 'P1-DATA', name: 'Data', sizeBytes: 512 * KIB }
+    ],
+    runtimeMemory: { heapBytes: 512 * KIB, stackBytes: 256 * KIB }
   },
   {
     id: 'P2', name: 'Browser',
     segments: [
       { id: 'P2-CODE', name: 'Code', sizeBytes: 1 * MIB },
-      { id: 'P2-DATA', name: 'Data', sizeBytes: 768 * KIB },
-      { id: 'P2-HEAP', name: 'Heap', sizeBytes: 1 * MIB },
-      { id: 'P2-STACK', name: 'Stack', sizeBytes: 256 * KIB }
-    ]
+      { id: 'P2-DATA', name: 'Data', sizeBytes: 768 * KIB }
+    ],
+    runtimeMemory: { heapBytes: 1 * MIB, stackBytes: 256 * KIB }
   },
   {
     id: 'P3', name: 'Editor',
     segments: [
       { id: 'P3-CODE', name: 'Code', sizeBytes: 512 * KIB },
-      { id: 'P3-DATA', name: 'Data', sizeBytes: 256 * KIB },
-      { id: 'P3-HEAP', name: 'Heap', sizeBytes: 256 * KIB },
-      { id: 'P3-STACK', name: 'Stack', sizeBytes: 256 * KIB }
-    ]
+      { id: 'P3-DATA', name: 'Data', sizeBytes: 256 * KIB }
+    ],
+    runtimeMemory: { heapBytes: 256 * KIB, stackBytes: 256 * KIB }
   },
   {
     id: 'P4', name: 'Database',
     segments: [
       { id: 'P4-CODE', name: 'Code', sizeBytes: 1 * MIB },
-      { id: 'P4-DATA', name: 'Data', sizeBytes: 1536 * KIB },
-      { id: 'P4-HEAP', name: 'Heap', sizeBytes: 1 * MIB },
-      { id: 'P4-STACK', name: 'Stack', sizeBytes: 512 * KIB }
-    ]
+      { id: 'P4-DATA', name: 'Data', sizeBytes: 1536 * KIB }
+    ],
+    runtimeMemory: { heapBytes: 1 * MIB, stackBytes: 512 * KIB }
   },
   {
     id: 'P5', name: 'Media Player',
     segments: [
       { id: 'P5-CODE', name: 'Code', sizeBytes: 768 * KIB },
-      { id: 'P5-DATA', name: 'Data', sizeBytes: 512 * KIB },
-      { id: 'P5-HEAP', name: 'Heap', sizeBytes: 1 * MIB },
-      { id: 'P5-STACK', name: 'Stack', sizeBytes: 256 * KIB }
-    ]
+      { id: 'P5-DATA', name: 'Data', sizeBytes: 512 * KIB }
+    ],
+    runtimeMemory: { heapBytes: 1 * MIB, stackBytes: 256 * KIB }
   }
 ].map((program, index) => ({
   ...program,
-  sizeBytes: program.segments.reduce((sum, segment) => sum + segment.sizeBytes, 0),
+  imageSizeBytes: program.segments.reduce((sum, segment) => sum + segment.sizeBytes, 0),
+  sizeBytes: program.segments.reduce((sum, segment) => sum + segment.sizeBytes, 0) + program.runtimeMemory.heapBytes + program.runtimeMemory.stackBytes,
+  runtimeRegions: [], // Created by the OS allocator when the process becomes resident.
   status: 'ready',
   arrivalOrder: index,
   start: null,
@@ -833,11 +840,11 @@ Expected:
 - Initialize each mode and verify full address coverage.
 - Allocate all default programs in multiple orders.
 - Terminate middle processes and verify holes.
-- Trigger external fragmentation in `DYNAMIC_COMPACTION` and verify that one allocation automatically compacts and retries.
+- Terminate a middle process in `DYNAMIC_COMPACTION` and verify immediate relocation and a single tail hole before another allocation.
 - Verify `DYNAMIC_NO_COMPACTION` still returns `EXTERNAL_FRAGMENTATION` for the same layout.
-- Verify undo after automatic compaction restores the original fragmented state in one step.
+- Verify undo after automatic compaction restores the terminated process and original addresses in one step.
 - Change algorithms mid-simulation and verify existing addresses remain unchanged.
-- Undo allocation, termination, and the combined automatic-compaction allocation.
+- Undo allocation, termination, and the combined termination with automatic compaction.
 - Export, import, and compare equivalent states.
 
 ### 25.4 Property-based invariants
@@ -855,7 +862,7 @@ For generated valid command sequences:
 ## 26. Performance Requirements
 
 - Support at least 500 programs and 1,000 memory blocks without incorrect behavior.
-- A single allocation (including automatic compaction when required) or termination should complete within 50 ms on a typical modern laptop for 1,000 blocks, excluding animation.
+- A single allocation or termination (including automatic compaction in that mode) should complete within 50 ms on a typical modern laptop for 1,000 blocks, excluding animation.
 - UI animation must not exceed 300 ms by default and must respect `prefers-reduced-motion`.
 - Rendering must not use one DOM element per byte, KiB, or fixed address unit.
 - Comparison runs must execute in memory without blocking the main thread for more than 100 ms; if scenarios grow beyond this threshold, chunk work or use a Web Worker.
@@ -895,7 +902,7 @@ For generated valid command sequences:
 - All addresses remain within `0x000000–0xFFFFFF`.
 - Static modes report internal fragmentation correctly.
 - Dynamic modes split and coalesce holes correctly.
-- Automatic compaction preserves process order, yields one final hole, and is visible as part of its triggering allocation.
+- Automatic compaction preserves process order, yields one final hole, and is visible as part of its triggering termination.
 - Keyboard-only operation covers every command.
 - UI text and controls meet WCAG AA contrast requirements.
 - The app runs from a static server without a build step.

@@ -7,7 +7,7 @@
 
 ## 1. Product Definition
 
-The product is an educational browser application that simulates contiguous memory allocation in a multiprogrammed system. It must let users configure memory, load and terminate programs, visualize physical addresses and internal program segments, compare allocation algorithms, and observe internal and external fragmentation. In dynamic-compaction mode, compaction is performed automatically as part of an allocation when required.
+The product is an educational browser application that simulates contiguous memory allocation in a multiprogrammed system. It must let users configure memory, load and terminate programs, visualize physical addresses and process memory, compare allocation algorithms, and observe fragmentation. In dynamic-compaction mode, compaction is performed automatically when a process terminates.
 
 The implementation must use Vanilla JavaScript, HTML, and CSS without a frontend framework or backend service.
 
@@ -40,7 +40,7 @@ Because no configuration choices were confirmed, version 1.0 uses these defaults
 - Programs are allocated contiguously by total size.
 - Program segments are informational subdivisions inside the program's contiguous allocation.
 - Program operations are manual and step-based: create, enqueue, allocate, terminate, undo, and reset.
-- In `DYNAMIC_COMPACTION`, an allocation that fails solely because of external fragmentation compacts and retries within the same transaction. The application reports this automatic relocation to the user.
+- In `DYNAMIC_COMPACTION`, termination frees the process and compacts the remaining processes in one transaction. Allocation never triggers compaction. The application reports relocation and bytes moved at termination.
 - All calculations use bytes internally. The UI accepts bytes, KiB, and MiB.
 - Changing the memory-management mode or partition layout requires a reset confirmation.
 
@@ -65,7 +65,7 @@ The mode selector must expose exactly these options:
 
 ### 6.1 Static partitions — equal size
 
-- User memory is divided into `N` equal partitions before the simulation starts.
+- The user chooses the size of each equal partition in B, KiB, or MiB. The count is `floor(userBytes / partitionSizeBytes)` and must be at least one. A remainder is displayed as unpartitioned memory that cannot hold a process; it is not counted as a free partition or internal fragmentation.
 - Default configuration: five partitions of 3 MiB each after the default 1 MiB OS region.
 - One partition can contain at most one program.
 - A program can be loaded only if its total size is less than or equal to the partition size.
@@ -81,6 +81,7 @@ The mode selector must expose exactly these options:
 - The selected allocation algorithm operates over free partitions that can contain the program.
 - Unused space inside the selected partition is internal fragmentation.
 - Partition boundaries never move during a simulation.
+- Partition sizes retain the entered order. Automatic size sorting remains pending explicit user authorization.
 
 ### 6.3 Dynamic partitions — no compaction
 
@@ -95,11 +96,11 @@ The mode selector must expose exactly these options:
 
 ### 6.4 Dynamic partitions — with compaction
 
-- Allocation and termination behavior is identical to dynamic partitions without compaction.
-- If allocation fails because the largest hole is too small but total free memory is sufficient, the allocation transaction automatically compacts memory and retries.
+- Allocation behaves like dynamic partitions without compaction and never moves existing processes.
+- Every successful termination frees the process and automatically compacts the remaining residents in the same transaction, before any subsequent allocation.
 - Automatic compaction moves allocated processes toward the lowest available user-memory address while preserving their current address order, then creates one free hole at the high-address end of memory.
-- The successful allocation exposes its relocated processes, moved bytes, and triggering program through its result details; the UI reports the event and displays the bytes moved by the latest compaction.
-- Undo treats automatic compaction and its triggering allocation as one state change.
+- The successful termination exposes its relocated processes, moved bytes, and terminating process through its result details; the UI reports the event and displays the bytes moved by the latest compaction, including zero when no relocation was needed.
+- Undo treats automatic compaction and its triggering termination as one state change.
 
 ## 7. Allocation Algorithms
 
@@ -131,18 +132,20 @@ Select the largest suitable candidate. If multiple candidates have equal size, s
 
 ## 8. Program Model
 
+The catalog and runtime executions are separate concepts. Catalog entries keep an **Execute** action and are not themselves loaded by UI commands. Every click creates a new instance with its own ID, addresses, and monotonically increasing per-program execution number, beginning at 1. Only resident instances appear under **Active executions**, with a **Terminate** action. Termination removes the instance from the active state; executing the catalog program later creates a new instance rather than reusing a terminated process. Session restore discards old non-resident child instances while preserving their consumed numbers and any resident addresses.
+
 Each simulated program must contain:
 
 - Unique immutable ID.
 - Editable display name.
 - Color assigned by the application.
 - Ordered internal segments.
-- Total size calculated as the sum of segment sizes.
+- Required process size calculated as image-segment bytes plus requested heap and stack reservations.
 - State: `ready`, `allocated`, `terminated`, or `rejected`.
 - Arrival order.
 - Current physical start and end addresses when allocated.
 
-The default segment types are `Code`, `Data`, `Heap`, and `Stack`. Custom segment names are allowed. A program must contain at least one segment, every segment size must be a positive integer number of bytes, and the sum must be at most the available user memory.
+The default program-image segments are `Code` and `Data`. Heap and stack are separate runtime-memory requests to the OS, with non-negative integer sizes. On allocation the OS creates private heap/stack reservations for each process; termination releases them. They belong to the process's user memory and do not consume the kernel reservation. Required capacity includes image plus both reservations. The contiguous educational model reserves the requested footprint upfront, without paging or dynamic malloc/free simulation. Custom image names are allowed except Heap and Stack.
 
 ### 8.1 Default programs
 
@@ -162,7 +165,7 @@ The application may provide additional presets, but these five must always be av
 
 1. User selects a management mode.
 2. User sets the OS reservation.
-3. User configures the partition count or sizes when the selected mode requires it.
+3. User configures the partition size or list of sizes when the selected mode requires it; equal partition count is derived automatically.
 4. User selects an allocation algorithm when applicable.
 5. User reviews the generated address map.
 6. User selects **Start simulation**.
@@ -193,14 +196,14 @@ The application may provide additional presets, but these five must always be av
 4. Dynamic mode converts its allocation into a hole and merges adjacent holes.
 5. Metrics and history update.
 
-### 9.5 Automatic compaction during allocation
+### 9.5 Automatic compaction during termination
 
-1. User selects **Allocate** for a ready program.
-2. If no individual hole is large enough but total free memory is sufficient, the simulator detects external fragmentation.
-3. Within that same allocation transaction, allocated processes move toward the OS boundary in physical-address order and segment offsets remain unchanged.
-4. The simulator retries the allocation against the single final hole.
-5. The UI confirms the successful allocation and reports the bytes moved.
-6. One undo operation restores the exact pre-allocation fragmented layout.
+1. User selects **Terminate** for a resident process.
+2. Its image and runtime reservations are released.
+3. Within that same transaction, remaining processes move toward the OS boundary in physical-address order and region offsets remain unchanged.
+4. All free memory forms a single final hole.
+5. The UI confirms termination and reports bytes moved, including zero for a tail process.
+6. One undo operation restores the terminated process and the original addresses together.
 
 ### 9.6 Compare algorithms
 
@@ -262,7 +265,7 @@ Every operation must produce a clear status message:
 - Partition or hole selected by the active algorithm.
 - Process terminated.
 - Adjacent holes merged.
-- Memory compacted automatically during allocation, including bytes moved and the allocated program.
+- Memory compacted automatically during termination, including bytes moved and the terminated process.
 - Invalid configuration or input.
 
 Messages must include the relevant program, requested size, algorithm, and candidate or failure reason.
@@ -310,7 +313,7 @@ For dynamic modes, internal fragmentation is zero under the simplified byte-exac
 - Duplicate program display names are allowed; IDs remain unique.
 - Allocating an already allocated or terminated program must be prevented.
 - Terminating a non-resident program must be prevented.
-- No manual compaction control may be exposed. Automatic compaction is attempted only by an allocation in `DYNAMIC_COMPACTION` after external fragmentation is detected.
+- No manual compaction control may be exposed. Automatic compaction occurs only after successful termination in `DYNAMIC_COMPACTION`.
 
 ## 14. History and Undo
 
@@ -386,7 +389,7 @@ Given separated holes totaling 4 MiB, compaction preserves process order, update
 
 ### AC-12 Segment integrity
 
-After allocation or compaction, each program segment retains its size and order, and the segment address ranges exactly cover the program allocation.
+After allocation or compaction, image segments and OS runtime reservations retain their sizes and order, and their address ranges together exactly cover the process allocation.
 
 ### AC-13 Algorithm isolation
 

@@ -20,8 +20,9 @@ test('Store & Commands: allocates and executes undo', () => {
   const allocRes = store.dispatch({ type: 'ALLOCATE_PROGRAM', programId: 'P1' });
   assert.equal(allocRes.ok, true);
   assert.equal(store.canUndo(), true);
-  assert.equal(store.getState().programs.find(p => p.id === 'P1').status, 'allocated');
-  assert.equal(store.getState().programs.find(p => p.id === 'P1').start, 0x100000);
+  assert.equal(store.getState().programs.find(p => p.id === 'P1').status, 'ready');
+  assert.equal(store.getState().programs.find(p => p.id === allocRes.details.programId).status, 'allocated');
+  assert.equal(store.getState().programs.find(p => p.id === allocRes.details.programId).start, 0x100000);
 
   // Deshace la asignación.
   const undoRes = store.dispatch({ type: 'UNDO' });
@@ -81,13 +82,14 @@ test('Store & Commands: starting normalizes programs that were allocated before 
 test('Store & Commands: restoring defaults is rejected while programs are allocated', () => {
   const initialState = createInitialState({ mode: MemoryMode.STATIC_EQUAL }, getDefaultPrograms());
   const store = createStore(initialState, reduceCommand);
-  assert.equal(store.dispatch({ type: 'ALLOCATE_PROGRAM', programId: 'P1' }).ok, true);
+  const allocation = store.dispatch({ type: 'ALLOCATE_PROGRAM', programId: 'P1' });
+  assert.equal(allocation.ok, true);
 
   const result = store.dispatch({ type: 'RESTORE_DEFAULT_PROGRAMS' });
 
   assert.equal(result.ok, false);
   assert.equal(result.code, 'INVALID_CONFIGURATION');
-  assert.equal(store.getState().programs.find(p => p.id === 'P1').status, 'allocated');
+  assert.equal(store.getState().programs.find(p => p.id === allocation.details.programId).status, 'allocated');
 });
 
 test('Persistence: Scenario export and import integrity', () => {

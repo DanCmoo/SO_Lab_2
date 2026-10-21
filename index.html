@@ -71,9 +71,16 @@
           </div>
 
           <div id="group-equal-config" class="form-field">
-            <label for="input-equal-count">Cantidad de particiones iguales:</label>
-            <input id="input-equal-count" type="number" min="1" max="64" value="5">
-            <small id="txt-equal-calc" class="font-mono text-muted">Cada una: 3 MiB</small>
+            <label for="input-equal-size">Tamaño de cada partición igual:</label>
+            <div class="input-with-unit">
+              <input id="input-equal-size" type="number" min="0" step="any" value="3" required>
+              <select id="select-equal-unit" aria-label="Unidad del tamaño de partición">
+                <option value="MiB" selected>MiB</option>
+                <option value="KiB">KiB</option>
+                <option value="B">Bytes</option>
+              </select>
+            </div>
+            <small id="txt-equal-calc" class="font-mono text-muted">5 particiones de 3 MiB</small>
           </div>
 
           <div id="group-unequal-config" class="form-field" style="display: none;">
@@ -89,16 +96,19 @@
       <!-- Program Ready Queue Card -->
       <section class="panel-card" id="sec-queue" aria-labelledby="heading-queue">
         <div class="panel-card-header">
-          <h2 id="heading-queue">Cola de procesos</h2>
+          <h2 id="heading-queue">Programas y ejecuciones</h2>
           <div class="header-btns">
             <button id="btn-open-new-program" class="btn-sm btn-primary" type="button">+ Nuevo</button>
             <button id="btn-restore-defaults" class="btn-sm" type="button" title="Restaurar los 5 programas predeterminados">Predeterminados</button>
           </div>
         </div>
 
-        <div id="queue-list" class="queue-list" role="list" aria-label="Simulated programs queue">
+        <h3 id="heading-program-catalog" class="program-list-heading">Programas disponibles</h3>
+        <div id="queue-list" class="queue-list program-catalog" role="list" aria-labelledby="heading-program-catalog">
           <!-- Populated dynamically by renderer -->
         </div>
+        <h3 id="heading-active-processes" class="program-list-heading">Ejecuciones activas</h3>
+        <div id="active-process-list" class="queue-list" role="list" aria-labelledby="heading-active-processes"></div>
       </section>
     </div>
 
@@ -231,15 +241,24 @@
       </div>
 
       <div class="form-field">
-        <label>Segmentos:</label>
+        <label>Segmentos de la imagen del programa:</label>
         <div id="new-prog-segments-list" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;">
           <!-- Segment inputs rendered dynamically -->
         </div>
         <button id="btn-add-segment-row" class="btn-sm" type="button">+ Añadir segmento</button>
       </div>
 
+      <fieldset class="form-field">
+        <legend>Memoria de ejecución solicitada al SO</legend>
+        <label for="input-heap-size">Reserva de heap (KiB):</label>
+        <input id="input-heap-size" type="number" min="0" step="any" value="256" required>
+        <label for="input-stack-size">Reserva de stack (KiB):</label>
+        <input id="input-stack-size" type="number" min="0" step="any" value="256" required>
+        <small class="text-muted">El SO reserva estas regiones para cada proceso al asignarlo y las libera al terminarlo. Pertenecen a la memoria del proceso. Esta simulación contigua mantiene fijos los tamaños solicitados.</small>
+      </fieldset>
+
       <div style="margin-top: 12px; font-weight: 600;">
-        Tamaño total calculado: <span id="txt-calc-prog-size" class="font-mono">0 B</span>
+        Memoria total requerida (imagen + reservas): <span id="txt-calc-prog-size" class="font-mono">0 B</span>
       </div>
 
       <div class="dialog-actions">

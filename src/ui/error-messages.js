@@ -30,17 +30,11 @@ export function describeError(source, context = {}) {
       return `La suma de las particiones desiguales es ${formatExactBytes(assignedBytes)}, pero la memoria de usuario disponible es ${formatExactBytes(availableBytes)}. Ajusta los tamaños para que su suma sea exactamente igual a la memoria disponible.`;
     }
 
-    const equalPartitions = /User memory \((\d+) bytes\) cannot be divided equally into (\d+) partitions/.exec(technicalMessage);
-    if (equalPartitions) {
-      const [, userBytes, count] = equalPartitions.map(Number);
-      return `La memoria de usuario (${formatExactBytes(userBytes)}) no puede dividirse exactamente entre ${count} particiones iguales. Elige una cantidad de particiones que no deje sobrantes.`;
-    }
-
     if (/OS size/.test(technicalMessage)) {
       return 'La reserva del sistema operativo no es válida. Debe ser un valor desde 0 bytes hasta menos de 16 MiB.';
     }
-    if (/Equal partition count/.test(technicalMessage)) {
-      return 'La cantidad de particiones iguales no es válida. Introduce un número entero mayor que cero.';
+    if (/Equal partition size/.test(technicalMessage)) {
+      return 'El tamaño de cada partición igual debe ser positivo, sin fracciones de byte, y no superar la memoria de usuario disponible.';
     }
     if (/Unequal partition sizes must not be empty/.test(technicalMessage)) {
       return 'Faltan los tamaños de las particiones desiguales. Introduce al menos un tamaño positivo separado por comas.';
@@ -58,6 +52,8 @@ export function describeError(source, context = {}) {
     case ErrorCode.INVALID_SIZE:
       return 'El tamaño indicado no es válido. Introduce un número positivo y una unidad admitida (B, KiB o MiB), sin fracciones de byte.';
     case ErrorCode.INVALID_PROGRAM:
+      if (/Heap and stack/.test(technicalMessage)) return 'Heap y stack son reservas de ejecución del SO. Configúralos en sus campos de solicitud de memoria, fuera de los segmentos de la imagen.';
+      if (/Runtime memory/.test(technicalMessage)) return 'Las reservas de heap y stack deben ser tamaños de cero o más bytes, sin fracciones de byte.';
       return `No se puede operar con el programa ${programLabel}: no existe o sus datos no son válidos.`;
     case ErrorCode.PROGRAM_NOT_READY:
       return `No se puede asignar el programa ${programLabel} porque no está en estado «Listo». Solo los programas listos pueden asignarse.`;

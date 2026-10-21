@@ -8,10 +8,9 @@ export const DEFAULT_PROGRAM_DEFS = Object.freeze([
     colorToken: 'var(--color-prog-1)',
     segments: [
       { id: 'P1-CODE', name: 'Code', sizeBytes: 768 * KIB },
-      { id: 'P1-DATA', name: 'Data', sizeBytes: 512 * KIB },
-      { id: 'P1-HEAP', name: 'Heap', sizeBytes: 512 * KIB },
-      { id: 'P1-STACK', name: 'Stack', sizeBytes: 256 * KIB }
-    ]
+      { id: 'P1-DATA', name: 'Data', sizeBytes: 512 * KIB }
+    ],
+    runtimeMemory: { heapBytes: 512 * KIB, stackBytes: 256 * KIB }
   },
   {
     id: 'P2',
@@ -19,10 +18,9 @@ export const DEFAULT_PROGRAM_DEFS = Object.freeze([
     colorToken: 'var(--color-prog-2)',
     segments: [
       { id: 'P2-CODE', name: 'Code', sizeBytes: 1 * MIB },
-      { id: 'P2-DATA', name: 'Data', sizeBytes: 768 * KIB },
-      { id: 'P2-HEAP', name: 'Heap', sizeBytes: 1 * MIB },
-      { id: 'P2-STACK', name: 'Stack', sizeBytes: 256 * KIB }
-    ]
+      { id: 'P2-DATA', name: 'Data', sizeBytes: 768 * KIB }
+    ],
+    runtimeMemory: { heapBytes: 1 * MIB, stackBytes: 256 * KIB }
   },
   {
     id: 'P3',
@@ -30,10 +28,9 @@ export const DEFAULT_PROGRAM_DEFS = Object.freeze([
     colorToken: 'var(--color-prog-3)',
     segments: [
       { id: 'P3-CODE', name: 'Code', sizeBytes: 512 * KIB },
-      { id: 'P3-DATA', name: 'Data', sizeBytes: 256 * KIB },
-      { id: 'P3-HEAP', name: 'Heap', sizeBytes: 256 * KIB },
-      { id: 'P3-STACK', name: 'Stack', sizeBytes: 256 * KIB }
-    ]
+      { id: 'P3-DATA', name: 'Data', sizeBytes: 256 * KIB }
+    ],
+    runtimeMemory: { heapBytes: 256 * KIB, stackBytes: 256 * KIB }
   },
   {
     id: 'P4',
@@ -41,10 +38,9 @@ export const DEFAULT_PROGRAM_DEFS = Object.freeze([
     colorToken: 'var(--color-prog-4)',
     segments: [
       { id: 'P4-CODE', name: 'Code', sizeBytes: 1 * MIB },
-      { id: 'P4-DATA', name: 'Data', sizeBytes: 1536 * KIB },
-      { id: 'P4-HEAP', name: 'Heap', sizeBytes: 1 * MIB },
-      { id: 'P4-STACK', name: 'Stack', sizeBytes: 512 * KIB }
-    ]
+      { id: 'P4-DATA', name: 'Data', sizeBytes: 1536 * KIB }
+    ],
+    runtimeMemory: { heapBytes: 1 * MIB, stackBytes: 512 * KIB }
   },
   {
     id: 'P5',
@@ -52,10 +48,9 @@ export const DEFAULT_PROGRAM_DEFS = Object.freeze([
     colorToken: 'var(--color-prog-5)',
     segments: [
       { id: 'P5-CODE', name: 'Code', sizeBytes: 768 * KIB },
-      { id: 'P5-DATA', name: 'Data', sizeBytes: 512 * KIB },
-      { id: 'P5-HEAP', name: 'Heap', sizeBytes: 1 * MIB },
-      { id: 'P5-STACK', name: 'Stack', sizeBytes: 256 * KIB }
-    ]
+      { id: 'P5-DATA', name: 'Data', sizeBytes: 512 * KIB }
+    ],
+    runtimeMemory: { heapBytes: 1 * MIB, stackBytes: 256 * KIB }
   }
 ]);
 

@@ -1,10 +1,11 @@
-import { MemoryMode, BlockKind, ProgramStatus, MIB } from '../domain/constants.js';
+import { MemoryMode, BlockKind, MIB } from '../domain/constants.js';
 import { toHexAddress, formatBytes } from '../domain/address.js';
 import { deriveMetrics } from '../domain/metrics.js';
 import { layoutSegments } from '../engine/compaction.js';
 import { renderMemoryMap } from './memory-map.js';
 import { updateConfigFormVisibility } from './forms.js';
 import { elements } from './elements.js';
+import { renderProgramLists } from './program-list.js';
 
 /**
  * Coordinador principal que proyecta el estado de la simulación en el DOM.
@@ -15,12 +16,6 @@ import { elements } from './elements.js';
 export function renderApp(state, store) {
   const { config, phase, programs, blocks, selectedId } = state;
   const isRunning = phase === 'RUNNING';
-  const statusLabels = {
-    ready: 'Listo',
-    allocated: 'Asignado',
-    terminated: 'Terminado',
-    rejected: 'Rechazado'
-  };
 
   // 1. Sincroniza los controles de la barra superior.
   if (elements.selectMode.value !== config.mode) {
@@ -33,8 +28,11 @@ export function renderApp(state, store) {
     elements.inputOsSize.value = config.osBytes / MIB;
     elements.selectOsUnit.value = 'MiB';
   }
-  if (config.mode === MemoryMode.STATIC_EQUAL && config.equalPartitionCount !== null) {
-    elements.inputEqualCount.value = config.equalPartitionCount;
+  if (config.mode === MemoryMode.STATIC_EQUAL) {
+    const unitBytes = { B: 1, KiB: 1024, MiB: MIB }[elements.selectEqualUnit.value];
+    if (Number(elements.inputEqualSize.value) * unitBytes !== config.equalPartitionSizeBytes) {
+      elements.inputEqualSize.value = config.equalPartitionSizeBytes / unitBytes;
+    }
   }
   if (config.mode === MemoryMode.STATIC_UNEQUAL) {
     elements.inputUnequalSizes.value = config.unequalPartitionSizes.map(size => size / MIB).join(', ');
@@ -55,55 +53,8 @@ export function renderApp(state, store) {
   // 2. Actualiza el estado del formulario de configuración.
   updateConfigFormVisibility(state);
 
-  // 3. Renderiza la cola de procesos.
-  const queueFragment = document.createDocumentFragment();
-  for (const prog of programs) {
-    const item = document.createElement('div');
-    item.className = 'queue-item';
-    if (prog.colorToken) {
-      item.style.setProperty('--prog-color', prog.colorToken);
-    }
-
-    let statusBadgeClass = 'badge-ready';
-    if (prog.status === ProgramStatus.ALLOCATED) statusBadgeClass = 'badge-allocated';
-    if (prog.status === ProgramStatus.TERMINATED) statusBadgeClass = 'badge-terminated';
-
-    const segmentSummary = prog.segments.map(s => `${s.name} ${formatBytes(s.sizeBytes)}`).join(', ');
-
-    let actionBtnHtml = '';
-    if (isRunning && prog.status === ProgramStatus.READY) {
-      actionBtnHtml = `<button class="btn-sm btn-primary btn-allocate" data-id="${prog.id}" type="button">Asignar</button>`;
-    } else if (isRunning && prog.status === ProgramStatus.ALLOCATED) {
-      actionBtnHtml = `<button class="btn-sm btn-danger btn-terminate" data-id="${prog.id}" type="button">Terminar</button>`;
-    } else if (!isRunning && prog.status === ProgramStatus.READY) {
-      actionBtnHtml = '<span class="text-muted" style="font-size:0.75rem;">Inicia la simulación para asignar</span>';
-    }
-
-    item.innerHTML = `
-      <div class="queue-item-info">
-        <div class="queue-item-title">
-          <span>${prog.name}</span>
-          <span class="badge ${statusBadgeClass}">${statusLabels[prog.status] || prog.status}</span>
-        </div>
-        <div class="queue-item-sub">
-          <strong>${formatBytes(prog.sizeBytes)}</strong> &bull; ${prog.segments.length} segmentos (${segmentSummary})
-        </div>
-        ${
-          prog.status === ProgramStatus.ALLOCATED && prog.start !== null
-            ? `<div class="queue-item-sub font-mono">${toHexAddress(prog.start)} &mdash; ${toHexAddress(prog.end)}</div>`
-            : ''
-        }
-      </div>
-      <div class="queue-item-actions">
-        ${actionBtnHtml}
-      </div>
-    `;
-
-    queueFragment.appendChild(item);
-  }
-
-  elements.queueList.innerHTML = '';
-  elements.queueList.appendChild(queueFragment);
+  // 3. Proyecta por separado el catálogo y las ejecuciones activas.
+  renderProgramLists(state);
 
   // 4. Renderiza el mapa visualizador de memoria.
   renderMemoryMap(state, blockId => {
@@ -143,13 +94,13 @@ export function renderApp(state, store) {
         const segs = layoutSegments(residentProg);
         segmentsHtml = `
           <div style="margin-top: 8px;">
-            <strong>Segmentos internos:</strong>
+            <strong>Imagen y memoria de ejecución:</strong>
             <ul style="list-style: none; margin-top: 4px; display: flex; flex-direction: column; gap: 4px;">
               ${segs
                 .map(
                   s => `
                 <li style="font-size: 0.8rem; background: var(--color-surface-strong); padding: 4px 8px; border-radius: 4px; display: flex; flex-direction: column; gap: 2px;">
-                  <span><strong>${s.name}</strong> (${formatBytes(s.sizeBytes)})</span>
+                  <span><strong>${s.name}</strong> (${formatBytes(s.sizeBytes)})${s.allocatedBy === 'OS' ? ` · Reserva del SO · ${s.growth === 'down' ? 'crece hacia direcciones menores' : 'crece hacia direcciones mayores'}` : ' · Imagen del programa'}</span>
                   <span class="font-mono text-muted" style="word-break: break-all;">${toHexAddress(s.start)} — ${toHexAddress(s.end)}</span>
                 </li>
               `
@@ -167,6 +118,7 @@ export function renderApp(state, store) {
           <div><strong>Dirección inicial:</strong> <span class="font-mono">${toHexAddress(block.start)}</span></div>
           <div><strong>Dirección final:</strong> <span class="font-mono">${toHexAddress(block.end)}</span></div>
           <div><strong>Capacidad / tamaño:</strong> <span class="font-mono">${formatBytes(block.sizeBytes)}</span></div>
+          ${block.kind === BlockKind.UNPARTITIONED ? '<div>Remanente menor que una partición completa. No se puede asignar en este modo.</div>' : ''}
           ${
             residentProg
               ? `<div><strong>Programa asignado:</strong> ${residentProg.name} (${residentProg.id})</div>`

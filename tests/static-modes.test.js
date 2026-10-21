@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryMode, MIB, AllocationAlgorithm } from '../src/domain/constants.js';
-import { createInitialState } from '../src/domain/models.js';
+import { createInitialState, createSimulationConfig } from '../src/domain/models.js';
+import { deriveMetrics } from '../src/domain/metrics.js';
 import { getDefaultPrograms } from '../src/data/default-programs.js';
 import { allocateStaticEqual, terminateStatic } from '../src/engine/static-equal.js';
 import { allocateStaticUnequal } from '../src/engine/static-unequal.js';
@@ -49,4 +50,34 @@ test('Static Unequal: allocates according to algorithm policy', () => {
   assert.equal(result.partitionId, 'PART-2');
   assert.equal(result.internalFragmentationBytes, 0);
   assert.doesNotThrow(() => assertState(result.state));
+});
+
+test('Static Equal: chosen partition size determines count and leaves an unassignable remainder', () => {
+  const state = createInitialState({ mode: MemoryMode.STATIC_EQUAL, equalPartitionSizeBytes: 4 * MIB });
+  assert.equal(state.partitions.length, 3);
+  assert.equal(state.config.equalPartitionCount, 3);
+  assert.ok(state.partitions.every(p => p.sizeBytes === 4 * MIB));
+  assert.equal(state.blocks.at(-1).kind, 'UNPARTITIONED');
+  assert.equal(state.blocks.at(-1).sizeBytes, 3 * MIB);
+  assert.equal(deriveMetrics(state).freeBytes, 12 * MIB);
+  assert.equal(deriveMetrics(state).unpartitionedBytes, 3 * MIB);
+  assertState(state);
+});
+
+test('Static Equal: rejects invalid sizes and keeps the chosen size when OS memory changes', () => {
+  for (const size of [0, -1, 1.5, NaN, Infinity, 16 * MIB]) {
+    assert.throws(() => createSimulationConfig({ equalPartitionSizeBytes: size }), { code: 'INVALID_CONFIGURATION' });
+  }
+  const state = createInitialState({ osBytes: 2 * MIB, equalPartitionSizeBytes: 3 * MIB });
+  assert.equal(state.partitions.length, 4);
+  assert.equal(state.blocks.at(-1).sizeBytes, 2 * MIB);
+  assertState(state);
+  assertState(createInitialState({ osBytes: 0, equalPartitionSizeBytes: 4 * MIB }));
+});
+
+test('Static Unequal: preserves explicitly entered order pending approval of sorting', () => {
+  const sizes = [4, 2, 1, 3, 5].map(size => size * MIB);
+  const state = createInitialState({ mode: MemoryMode.STATIC_UNEQUAL, unequalPartitionSizes: sizes });
+  assert.deepEqual(state.partitions.map(p => p.sizeBytes), sizes);
+  assertState(state);
 });

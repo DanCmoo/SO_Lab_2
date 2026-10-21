@@ -2,6 +2,7 @@ import { ProgramStatus } from '../domain/constants.js';
 import { DomainError, ErrorCode } from '../domain/errors.js';
 import { extractCandidates } from './candidates.js';
 import { selectCandidate } from './allocators.js';
+import { createRuntimeRegions } from './process-memory.js';
 import { terminateStatic } from './static-equal.js';
 
 export { terminateStatic };
@@ -58,6 +59,7 @@ export function allocateStaticUnequal(state, programId, algorithmOverride) {
   const updatedProgram = {
     ...program,
     status: ProgramStatus.ALLOCATED,
+    runtimeRegions: createRuntimeRegions(program),
     start: programStart,
     end: programEnd,
     containerId: targetPartition.id

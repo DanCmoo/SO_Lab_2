@@ -1,5 +1,60 @@
 import { STORAGE_KEY, STATE_SCHEMA_VERSION } from '../domain/constants.js';
 import { assertState } from '../domain/invariants.js';
+import { createProgram, createSimulationConfig } from '../domain/models.js';
+import { createRuntimeRegions } from '../engine/process-memory.js';
+import { DomainError, ErrorCode } from '../domain/errors.js';
+import { nextExecutionNumber } from '../domain/executions.js';
+
+/** Convierte sesiones anteriores sin alterar el orden ni los límites físicos. */
+function restoreState(parsed) {
+  if (![1, STATE_SCHEMA_VERSION].includes(parsed?.schemaVersion)) {
+    throw new DomainError(ErrorCode.UNSUPPORTED_SCHEMA, 'Unsupported state schema');
+  }
+  const configDraft = { ...parsed.config };
+  if (parsed.schemaVersion === 1 && configDraft.mode === 'STATIC_EQUAL') {
+    configDraft.equalPartitionSizeBytes = (configDraft.totalBytes - configDraft.osBytes) / configDraft.equalPartitionCount;
+  }
+  const config = createSimulationConfig(configDraft);
+  const programs = parsed.programs.map(program => {
+    const legacy = parsed.schemaVersion === 1;
+    const segments = legacy ? program.segments.filter(segment => !/^(heap|stack)$/i.test(segment.name.trim())) : program.segments;
+    const legacyBytes = name => program.segments.filter(segment => segment.name.trim().toLowerCase() === name).reduce((sum, segment) => sum + segment.sizeBytes, 0);
+    const runtimeMemory = legacy
+      ? { heapBytes: legacyBytes('heap'), stackBytes: legacyBytes('stack') }
+      : program.runtimeMemory;
+    const source = program.sourceProgramId ? parsed.programs.find(p => p.id === program.sourceProgramId) : null;
+    const validated = createProgram({ ...program, name: source?.name || program.name, segments, runtimeMemory });
+    return {
+      ...program,
+      ...validated,
+      name: program.name,
+      runtimeRegions: program.status === 'allocated' ? createRuntimeRegions(validated) : Object.freeze([])
+    };
+  });
+  const activePrograms = programs.filter(program => !program.sourceProgramId || program.status === 'allocated').map(program => program.sourceProgramId
+    ? program
+    : { ...program, nextInstanceNumber: nextExecutionNumber(programs, program) });
+  const state = { ...parsed, schemaVersion: STATE_SCHEMA_VERSION, config, programs: activePrograms };
+  assertState(state);
+  return state;
+}
+
+export function exportScenario(state) {
+  return JSON.stringify({ schemaVersion: STATE_SCHEMA_VERSION, activeState: state });
+}
+
+export function importScenario(json) {
+  try {
+    const payload = JSON.parse(json);
+    if (![1, STATE_SCHEMA_VERSION].includes(payload?.schemaVersion)) {
+      throw new DomainError(ErrorCode.UNSUPPORTED_SCHEMA, 'Unsupported scenario schema');
+    }
+    return restoreState(payload.activeState || payload);
+  } catch (error) {
+    if (error instanceof DomainError) throw error;
+    throw new DomainError(ErrorCode.UNSUPPORTED_SCHEMA, 'Invalid scenario');
+  }
+}
 
 /**
  * Persiste el estado de la simulación en localStorage con la clave 'mms:simulation:v1'.
@@ -34,11 +89,7 @@ export function loadFromStorage() {
     if (!raw) return null;
 
     const parsed = JSON.parse(raw);
-    if (parsed.schemaVersion !== STATE_SCHEMA_VERSION) {
-      return null;
-    }
-    assertState(parsed);
-    return parsed;
+    return restoreState(parsed);
   } catch (_e) {
     return null;
   }

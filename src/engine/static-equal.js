@@ -1,6 +1,7 @@
 import { ProgramStatus } from '../domain/constants.js';
 import { DomainError, ErrorCode } from '../domain/errors.js';
 import { extractCandidates } from './candidates.js';
+import { createRuntimeRegions } from './process-memory.js';
 
 /**
  * Asigna un programa en la partición estática libre de igual tamaño y menor dirección.
@@ -53,6 +54,7 @@ export function allocateStaticEqual(state, programId) {
   const updatedProgram = {
     ...program,
     status: ProgramStatus.ALLOCATED,
+    runtimeRegions: createRuntimeRegions(program),
     start: programStart,
     end: programEnd,
     containerId: targetPartition.id
@@ -136,6 +138,7 @@ export function terminateStatic(state, programId) {
       ? {
           ...p,
           status: ProgramStatus.TERMINATED,
+          runtimeRegions: Object.freeze([]),
           start: null,
           end: null,
           containerId: null

@@ -136,6 +136,8 @@
 .queue-item-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: var(--space-2);
 }
 
@@ -503,3 +505,25 @@ select option { color: var(--color-text); background: var(--color-surface); }
   .panel-col-center { overflow: hidden; }
   .panel-col-center .memory-map-container { height: 100%; }
 }
+.kind-unpartitioned {
+  background: repeating-linear-gradient(135deg, var(--color-surface-strong), var(--color-surface-strong) 6px, var(--color-border) 6px, var(--color-border) 8px);
+}
+
+.segment-slice.runtime-region {
+  border: 1px dashed var(--color-muted);
+}
+
+.program-list-heading {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-muted);
+}
+
+#sec-queue .queue-list {
+  max-height: min(280px, 30vh);
+  flex-shrink: 0;
+}
+
+.execution-empty { font-size: 11px; padding: 6px 0; }
+.catalog-item .queue-item-info, .execution-item .queue-item-info { min-width: 0; }
+.catalog-item .queue-item-title, .execution-item .queue-item-title { flex-wrap: wrap; }

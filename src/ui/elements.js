@@ -15,7 +15,8 @@ export const elements = {
   inputOsSize: document.getElementById('input-os-size'),
   selectOsUnit: document.getElementById('select-os-unit'),
   groupEqualConfig: document.getElementById('group-equal-config'),
-  inputEqualCount: document.getElementById('input-equal-count'),
+  inputEqualSize: document.getElementById('input-equal-size'),
+  selectEqualUnit: document.getElementById('select-equal-unit'),
   txtEqualCalc: document.getElementById('txt-equal-calc'),
   groupUnequalConfig: document.getElementById('group-unequal-config'),
   inputUnequalSizes: document.getElementById('input-unequal-sizes'),
@@ -26,6 +27,8 @@ export const elements = {
   btnOpenNewProgram: document.getElementById('btn-open-new-program'),
   btnRestoreDefaults: document.getElementById('btn-restore-defaults'),
   queueList: document.getElementById('queue-list'),
+  programsPanel: document.getElementById('sec-queue'),
+  activeProcessList: document.getElementById('active-process-list'),
 
   // Memory map panel
   statusBanner: document.getElementById('status-banner'),
@@ -54,6 +57,8 @@ export const elements = {
   // Dialogs
   dialogNewProgram: document.getElementById('dialog-new-program'),
   inputProgName: document.getElementById('input-prog-name'),
+  inputHeapSize: document.getElementById('input-heap-size'),
+  inputStackSize: document.getElementById('input-stack-size'),
   newProgSegmentsList: document.getElementById('new-prog-segments-list'),
   btnAddSegmentRow: document.getElementById('btn-add-segment-row'),
   txtCalcProgSize: document.getElementById('txt-calc-prog-size'),

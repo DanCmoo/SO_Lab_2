@@ -15,7 +15,8 @@ export function renderMemoryMap(state, onSelectBlock) {
     OS: 'Sistema operativo',
     PARTITION: 'Partición',
     PROCESS: 'Proceso',
-    HOLE: 'Hueco libre'
+    HOLE: 'Hueco libre',
+    UNPARTITIONED: 'Sin particionar (no asignable)'
   };
   const isStatic =
     config.mode === MemoryMode.STATIC_EQUAL ||
@@ -81,6 +82,8 @@ export function renderMemoryMap(state, onSelectBlock) {
       titleText = 'Sistema operativo';
     } else if (block.kind === BlockKind.HOLE) {
       titleText = 'Hueco de memoria libre';
+    } else if (block.kind === BlockKind.UNPARTITIONED) {
+      titleText = 'Sin particionar (no asignable)';
     } else if (block.kind === BlockKind.PROCESS) {
       residentProg = programs.find(p => p.id === block.programId);
       titleText = residentProg ? `${residentProg.name} (${residentProg.id})` : `Proceso ${block.programId}`;
@@ -119,9 +122,9 @@ export function renderMemoryMap(state, onSelectBlock) {
       const placedSegments = layoutSegments(residentProg);
       for (const seg of placedSegments) {
         const segSlice = document.createElement('div');
-        segSlice.className = 'segment-slice';
+        segSlice.className = `segment-slice${seg.allocatedBy === 'OS' ? ' runtime-region' : ''}`;
         segSlice.style.flex = `${seg.sizeBytes}`;
-        segSlice.textContent = `${seg.name} (${formatBytes(seg.sizeBytes)})`;
+        segSlice.textContent = `${seg.name}${seg.allocatedBy === 'OS' ? ' · SO' : ''} (${formatBytes(seg.sizeBytes)})`;
         segSlice.title = `${seg.name}: ${formatBytes(seg.sizeBytes)} [${toHexAddress(seg.start)} - ${toHexAddress(seg.end)}]`;
         segmentsWrapper.appendChild(segSlice);
       }

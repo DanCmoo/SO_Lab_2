@@ -16,7 +16,7 @@ import { createMemoryBlock } from '../domain/models.js';
 export function layoutSegments(program) {
   if (program.start === null) return [];
   let cursor = program.start;
-  return program.segments.map(segment => {
+  return [...program.segments, ...(program.runtimeRegions || [])].map(segment => {
     const placed = {
       ...segment,
       start: cursor,
@@ -130,7 +130,7 @@ export function compactMemory(state) {
   }
 
   const freeBytes = TOTAL_MEMORY_BYTES - cursor;
-  const newBlocks = [osBlock, ...newProcessBlocks];
+  const newBlocks = [...(osBlock ? [osBlock] : []), ...newProcessBlocks];
 
   if (freeBytes > 0) {
     newBlocks.push(

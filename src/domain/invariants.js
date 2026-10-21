@@ -88,7 +88,7 @@ export function assertState(state) {
 
   // Invariante del bloque del sistema operativo.
   const osBlock = blocks[0];
-  if (osBlock.kind !== BlockKind.OS || osBlock.start !== 0 || osBlock.sizeBytes !== config.osBytes) {
+  if (config.osBytes > 0 && (osBlock.kind !== BlockKind.OS || osBlock.start !== 0 || osBlock.sizeBytes !== config.osBytes)) {
     throw new DomainError(ErrorCode.STATE_INVARIANT_FAILED, 'OS block must be first with configured OS size');
   }
 
@@ -96,10 +96,17 @@ export function assertState(state) {
   const allocatedPrograms = new Set();
   for (const prog of programs) {
     const segmentSum = prog.segments.reduce((acc, s) => acc + s.sizeBytes, 0);
-    if (prog.sizeBytes !== segmentSum) {
+    if ([prog.runtimeMemory?.heapBytes ?? 0, prog.runtimeMemory?.stackBytes ?? 0].some(bytes => !Number.isSafeInteger(bytes) || bytes < 0)) {
+      throw new DomainError(ErrorCode.STATE_INVARIANT_FAILED, `Invalid runtime memory request for ${prog.id}`);
+    }
+    if (prog.imageSizeBytes !== segmentSum) {
+      throw new DomainError(ErrorCode.STATE_INVARIANT_FAILED, `Program ${prog.id} image size mismatch`);
+    }
+    const runtimeBytes = (prog.runtimeMemory?.heapBytes ?? 0) + (prog.runtimeMemory?.stackBytes ?? 0);
+    if (prog.sizeBytes !== segmentSum + runtimeBytes) {
       throw new DomainError(
         ErrorCode.STATE_INVARIANT_FAILED,
-        `Program ${prog.id} total size ${prog.sizeBytes} does not equal segment sum ${segmentSum}`
+        `Program ${prog.id} total size does not equal image plus runtime memory`
       );
     }
 
@@ -115,7 +122,20 @@ export function assertState(state) {
       if (prog.end !== prog.start + prog.sizeBytes - 1) {
         throw new DomainError(ErrorCode.STATE_INVARIANT_FAILED, `Allocated program ${prog.id} address span mismatch`);
       }
+      const regions = prog.runtimeRegions || [];
+      for (const [kind, bytes] of [['HEAP', prog.runtimeMemory?.heapBytes ?? 0], ['STACK', prog.runtimeMemory?.stackBytes ?? 0]]) {
+        const matching = regions.filter(region => region.kind === kind);
+        if (matching.length !== (bytes > 0 ? 1 : 0) || matching.some(region => region.sizeBytes !== bytes || region.allocatedBy !== 'OS' || region.programId !== prog.id)) {
+          throw new DomainError(ErrorCode.STATE_INVARIANT_FAILED, `Invalid ${kind} reservation for process ${prog.id}`);
+        }
+      }
+      if (regions.reduce((sum, region) => sum + region.sizeBytes, 0) !== runtimeBytes) {
+        throw new DomainError(ErrorCode.STATE_INVARIANT_FAILED, `Runtime reservation mismatch for ${prog.id}`);
+      }
     } else {
+      if (prog.runtimeRegions?.length) {
+        throw new DomainError(ErrorCode.STATE_INVARIANT_FAILED, `Non-resident program ${prog.id} retains runtime memory`);
+      }
       if (prog.start !== null || prog.end !== null) {
         throw new DomainError(
           ErrorCode.STATE_INVARIANT_FAILED,
@@ -127,6 +147,9 @@ export function assertState(state) {
 
   // 4. Invariantes específicas del modo.
   if (config.mode === MemoryMode.STATIC_EQUAL || config.mode === MemoryMode.STATIC_UNEQUAL) {
+    if (config.mode === MemoryMode.STATIC_EQUAL && partitions.some(part => part.sizeBytes !== config.equalPartitionSizeBytes)) {
+      throw new DomainError(ErrorCode.STATE_INVARIANT_FAILED, 'Equal partitions must have the configured size');
+    }
     // Cada partición contiene como máximo un programa.
     const seenPrograms = new Set();
     for (const part of partitions) {

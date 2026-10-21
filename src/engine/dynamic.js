@@ -3,6 +3,7 @@ import { DomainError, ErrorCode } from '../domain/errors.js';
 import { extractCandidates } from './candidates.js';
 import { selectCandidate } from './allocators.js';
 import { createMemoryBlock } from '../domain/models.js';
+import { createRuntimeRegions } from './process-memory.js';
 
 /**
  * Clasifica el motivo de un fallo de asignación dinámica.
@@ -135,6 +136,7 @@ export function allocateDynamic(state, programId, algorithmOverride) {
   const updatedProgram = {
     ...program,
     status: ProgramStatus.ALLOCATED,
+    runtimeRegions: createRuntimeRegions(program),
     start: processBlock.start,
     end: processBlock.end,
     containerId: null
@@ -201,6 +203,7 @@ export function terminateDynamic(state, programId) {
   const updatedProgram = {
     ...program,
     status: ProgramStatus.TERMINATED,
+    runtimeRegions: Object.freeze([]),
     start: null,
     end: null,
     containerId: null

@@ -36,7 +36,8 @@ export function updateConfigFormVisibility(state) {
   elements.selectMode.disabled = !isConfiguring;
   elements.inputOsSize.disabled = !isConfiguring;
   elements.selectOsUnit.disabled = !isConfiguring;
-  elements.inputEqualCount.disabled = !isConfiguring;
+  elements.inputEqualSize.disabled = !isConfiguring;
+  elements.selectEqualUnit.disabled = !isConfiguring;
   elements.inputUnequalSizes.disabled = !isConfiguring;
   elements.btnApplyConfig.disabled = !isConfiguring;
 
@@ -51,7 +52,7 @@ export function recalculateConfigValues() {
   const osUnit = elements.selectOsUnit.value;
   let osBytes = 1 * MIB;
   try {
-    osBytes = parseUnitToBytes(osRaw, osUnit);
+    osBytes = osRaw.trim() !== '' && Number(osRaw) === 0 ? 0 : parseUnitToBytes(osRaw, osUnit);
   } catch (_e) {
     // Usa el valor predeterminado si la entrada no es válida.
   }
@@ -60,13 +61,15 @@ export function recalculateConfigValues() {
   const mode = elements.selectMode.value;
 
   if (mode === MemoryMode.STATIC_EQUAL) {
-    const count = parseInt(elements.inputEqualCount.value, 10) || 5;
-    if (count > 0 && userBytes % count === 0) {
-      const partSize = userBytes / count;
-      elements.txtEqualCalc.textContent = `Cada una: ${formatBytes(partSize)}`;
+    try {
+      const partSize = parseUnitToBytes(elements.inputEqualSize.value, elements.selectEqualUnit.value);
+      const count = Math.floor(userBytes / partSize);
+      if (count < 1) throw new Error('Partition exceeds user memory');
+      const remainder = userBytes % partSize;
+      elements.txtEqualCalc.textContent = `${count} particiones de ${formatBytes(partSize)}${remainder ? ` · Sin particionar: ${formatBytes(remainder)} (no asignable)` : ''}`;
       elements.txtEqualCalc.style.color = 'var(--color-muted)';
-    } else {
-      elements.txtEqualCalc.textContent = `No válido: ${formatBytes(userBytes)} no es divisible entre ${count}`;
+    } catch (_error) {
+      elements.txtEqualCalc.textContent = `Introduce un tamaño positivo de hasta ${formatBytes(userBytes)}, sin fracciones de byte.`;
       elements.txtEqualCalc.style.color = 'var(--color-danger)';
     }
   } else if (mode === MemoryMode.STATIC_UNEQUAL) {
@@ -95,13 +98,13 @@ export function recalculateConfigValues() {
 export function resetCustomProgramForm() {
   elements.inputProgName.value = '';
   elements.newProgSegmentsList.innerHTML = '';
+  elements.inputHeapSize.value = '256';
+  elements.inputStackSize.value = '256';
 
-  // Plantilla de segmentos predeterminada (Code, Data, Heap, Stack).
+  // Solo la imagen del programa; heap y stack se solicitan aparte al SO.
   const defaultSegments = [
     { name: 'Code', size: 512, unit: 'KiB' },
-    { name: 'Data', size: 256, unit: 'KiB' },
-    { name: 'Heap', size: 256, unit: 'KiB' },
-    { name: 'Stack', size: 256, unit: 'KiB' }
+    { name: 'Data', size: 256, unit: 'KiB' }
   ];
 
   for (const seg of defaultSegments) {
@@ -166,12 +169,23 @@ export function recalculateCustomProgramSize() {
     }
   }
 
+  try {
+    const runtimeMemory = readRuntimeMemory();
+    totalBytes += runtimeMemory.heapBytes + runtimeMemory.stackBytes;
+  } catch (_error) {
+    // El dominio valida las reservas al guardar.
+  }
   elements.txtCalcProgSize.textContent = formatBytes(totalBytes);
+}
+
+function readRuntimeMemory() {
+  const parseReservation = input => input.value.trim() === '' ? NaN : Number(input.value) === 0 ? 0 : parseUnitToBytes(input.value, 'KiB');
+  return { heapBytes: parseReservation(elements.inputHeapSize), stackBytes: parseReservation(elements.inputStackSize) };
 }
 
 /**
  * Lee y devuelve el borrador del programa personalizado del formulario.
- * @returns {{ name: string, segments: Array<{ name: string, sizeBytes: number }> }}
+ * @returns {{ name: string, segments: Array<{ name: string, sizeBytes: number }>, runtimeMemory: {heapBytes:number, stackBytes:number} }}
  */
 export function getCustomProgramDraft() {
   const name = elements.inputProgName.value.trim();
@@ -191,5 +205,5 @@ export function getCustomProgramDraft() {
     });
   }
 
-  return { name, segments };
+  return { name, segments, runtimeMemory: readRuntimeMemory() };
 }

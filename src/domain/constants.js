@@ -5,7 +5,7 @@ export const TOTAL_MEMORY_BYTES = 16 * MIB; // 16,777,216 bytes
 export const MIN_ADDRESS = 0x000000;
 export const MAX_ADDRESS = 0xFFFFFF;
 export const DEFAULT_OS_BYTES = 1 * MIB;
-export const STATE_SCHEMA_VERSION = 1;
+export const STATE_SCHEMA_VERSION = 2;
 export const STORAGE_KEY = 'mms:simulation:v1';
 
 export const MemoryMode = Object.freeze({
@@ -32,7 +32,8 @@ export const BlockKind = Object.freeze({
   OS: 'OS',
   PARTITION: 'PARTITION',
   PROCESS: 'PROCESS',
-  HOLE: 'HOLE'
+  HOLE: 'HOLE',
+  UNPARTITIONED: 'UNPARTITIONED'
 });
 
 export const SimulationPhase = Object.freeze({
@@ -40,7 +41,7 @@ export const SimulationPhase = Object.freeze({
   RUNNING: 'RUNNING'
 });
 
-export const DEFAULT_STATIC_EQUAL_COUNT = 5;
+export const DEFAULT_STATIC_EQUAL_SIZE = 3 * MIB;
 export const DEFAULT_STATIC_UNEQUAL_SIZES = Object.freeze([
   1 * MIB,
   2 * MIB,

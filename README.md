@@ -38,12 +38,16 @@ La aplicación guarda el estado de la simulación en el almacenamiento local del
 
 - Memoria física simulada de 16 MiB, con direcciones de 24 bits.
 - Reserva configurable para el sistema operativo.
-- Modos de particiones estáticas iguales o desiguales y particiones dinámicas con o sin compactación.
+- Modos de particiones estáticas iguales o desiguales y particiones dinámicas con o sin compactación. Las particiones iguales se configuran por tamaño (B, KiB o MiB); la cantidad se calcula automáticamente y cualquier remanente se muestra como memoria sin particionar, no asignable.
 - Algoritmos de asignación First Fit, Best Fit y Worst Fit cuando corresponden.
 - Asignación y terminación de programas predeterminados o personalizados.
-- Visualización del mapa de memoria, métricas, direcciones y segmentos de cada proceso.
-- Compactación automática ante fragmentación externa en el modo dinámico con compactación.
+- El catálogo de **Programas disponibles** conserva el botón **Ejecutar**. Cada clic crea una instancia nueva (`#1`, `#2`, `#3`, etc.) mientras haya memoria disponible. **Ejecuciones activas** muestra esas instancias con su botón **Terminar**; al terminar salen del listado y liberan su memoria. La numeración continúa sin reutilizar ejecuciones terminadas, también al reanudar la sesión.
+- Visualización del mapa de memoria, métricas, direcciones, imagen del programa y reservas de ejecución de cada proceso.
+- Heap y stack se solicitan al SO por separado de la imagen del programa. El SO reserva esas regiones al asignar cada proceso y las libera al terminarlo; cuentan como memoria del proceso, sin consumir la reserva del núcleo. Los tamaños permanecen fijos durante la ejecución en este modelo contiguo: no se simulan paginación, demanda de páginas ni llamadas a malloc/free.
+- Compactación automática al terminar un proceso en el modo dinámico con compactación. Los procesos restantes conservan su orden y la memoria libre queda en un único hueco final. Añadir o asignar programas no compacta.
+- Las particiones desiguales conservan el orden ingresado. Ordenarlas por tamaño es una modificación pendiente de autorización.
 - Comparación de algoritmos y persistencia de la sesión en el navegador.
+- Las sesiones de la versión anterior se convierten al modelo actual al reanudarlas, conservando direcciones, tamaños y orden de las particiones.
 
 ## Cómo está organizado el proyecto
 

@@ -7,7 +7,7 @@ import {
   ProgramStatus,
   BlockKind,
   SimulationPhase,
-  DEFAULT_STATIC_EQUAL_COUNT,
+  DEFAULT_STATIC_EQUAL_SIZE,
   DEFAULT_STATIC_UNEQUAL_SIZES
 } from './constants.js';
 import { endAddress } from './address.js';
@@ -46,6 +46,7 @@ export function createSegment({ id, name, sizeBytes }) {
  * @param {string} params.name
  * @param {string} [params.colorToken]
  * @param {Array<{id: string, name: string, sizeBytes: number}>} params.segments
+ * @param {{heapBytes?: number, stackBytes?: number}} [params.runtimeMemory] Reservas solicitadas al SO.
  * @param {number} [params.arrivalOrder=0]
  * @param {string} [params.status=ProgramStatus.READY]
  * @param {number|null} [params.start=null]
@@ -58,6 +59,7 @@ export function createProgram({
   name,
   colorToken = 'var(--color-prog-1)',
   segments,
+  runtimeMemory = {},
   arrivalOrder = 0,
   status = ProgramStatus.READY,
   start = null,
@@ -83,7 +85,22 @@ export function createProgram({
     })
   );
 
-  const totalSize = validSegments.reduce((sum, seg) => sum + seg.sizeBytes, 0);
+  if (validSegments.some(seg => /^(heap|stack)$/i.test(seg.name))) {
+    throw new DomainError(ErrorCode.INVALID_PROGRAM, 'Heap and stack must be requested as runtime memory, not program segments');
+  }
+  if (!runtimeMemory || typeof runtimeMemory !== 'object') {
+    throw new DomainError(ErrorCode.INVALID_PROGRAM, 'Runtime memory request must be an object');
+  }
+  const heapBytes = runtimeMemory.heapBytes ?? 0;
+  const stackBytes = runtimeMemory.stackBytes ?? 0;
+  for (const bytes of [heapBytes, stackBytes]) {
+    if (!Number.isSafeInteger(bytes) || bytes < 0) {
+      throw new DomainError(ErrorCode.INVALID_PROGRAM, 'Runtime memory sizes must be non-negative safe integers');
+    }
+  }
+
+  const imageSizeBytes = validSegments.reduce((sum, seg) => sum + seg.sizeBytes, 0);
+  const totalSize = imageSizeBytes + heapBytes + stackBytes;
   if (!Number.isSafeInteger(totalSize) || totalSize <= 0) {
     throw new DomainError(ErrorCode.INVALID_PROGRAM, 'Total program size must be a positive integer');
   }
@@ -96,6 +113,9 @@ export function createProgram({
     name: cleanName,
     colorToken,
     segments: validSegments,
+    imageSizeBytes,
+    runtimeMemory: Object.freeze({ heapBytes, stackBytes }),
+    runtimeRegions: Object.freeze([]),
     sizeBytes: totalSize,
     status,
     arrivalOrder,
@@ -171,19 +191,15 @@ export function createSimulationConfig(overrides = {}) {
   const userBytes = totalBytes - osBytes;
 
   let equalPartitionCount = null;
+  let equalPartitionSizeBytes = null;
   let unequalPartitionSizes = [];
 
   if (mode === MemoryMode.STATIC_EQUAL) {
-    equalPartitionCount = overrides.equalPartitionCount ?? DEFAULT_STATIC_EQUAL_COUNT;
-    if (!Number.isSafeInteger(equalPartitionCount) || equalPartitionCount <= 0) {
-      throw new DomainError(ErrorCode.INVALID_CONFIGURATION, 'Equal partition count must be a positive integer');
+    equalPartitionSizeBytes = overrides.equalPartitionSizeBytes ?? DEFAULT_STATIC_EQUAL_SIZE;
+    if (!Number.isSafeInteger(equalPartitionSizeBytes) || equalPartitionSizeBytes <= 0 || equalPartitionSizeBytes > userBytes) {
+      throw new DomainError(ErrorCode.INVALID_CONFIGURATION, 'Equal partition size must be a positive integer no larger than user memory');
     }
-    if (userBytes % equalPartitionCount !== 0) {
-      throw new DomainError(
-        ErrorCode.INVALID_CONFIGURATION,
-        `User memory (${userBytes} bytes) cannot be divided equally into ${equalPartitionCount} partitions without remainder`
-      );
-    }
+    equalPartitionCount = Math.floor(userBytes / equalPartitionSizeBytes);
   } else if (mode === MemoryMode.STATIC_UNEQUAL) {
     unequalPartitionSizes = overrides.unequalPartitionSizes
       ? [...overrides.unequalPartitionSizes]
@@ -213,6 +229,7 @@ export function createSimulationConfig(overrides = {}) {
     algorithm,
     totalBytes,
     osBytes,
+    equalPartitionSizeBytes,
     equalPartitionCount,
     unequalPartitionSizes: Object.freeze(unequalPartitionSizes)
   });
@@ -226,20 +243,19 @@ export function createSimulationConfig(overrides = {}) {
  */
 export function createInitialState(configOverrides = {}, initialPrograms = []) {
   const config = createSimulationConfig(configOverrides);
-  const osBlock = createMemoryBlock({
+  const osBlock = config.osBytes > 0 ? createMemoryBlock({
     id: 'BLOCK-OS',
     kind: BlockKind.OS,
     start: 0,
     sizeBytes: config.osBytes,
     programId: null
-  });
+  }) : null;
 
   let partitions = [];
   let blocks = [];
 
   if (config.mode === MemoryMode.STATIC_EQUAL) {
-    const userBytes = config.totalBytes - config.osBytes;
-    const partitionSize = userBytes / config.equalPartitionCount;
+    const partitionSize = config.equalPartitionSizeBytes;
     let cursor = config.osBytes;
 
     for (let i = 0; i < config.equalPartitionCount; i++) {
@@ -260,6 +276,14 @@ export function createInitialState(configOverrides = {}, initialPrograms = []) {
         })
       );
       cursor = p.end + 1;
+    }
+    if (cursor < config.totalBytes) {
+      blocks.push(createMemoryBlock({
+        id: 'BLOCK-UNPARTITIONED',
+        kind: BlockKind.UNPARTITIONED,
+        start: cursor,
+        sizeBytes: config.totalBytes - cursor
+      }));
     }
   } else if (config.mode === MemoryMode.STATIC_UNEQUAL) {
     let cursor = config.osBytes;
@@ -299,7 +323,7 @@ export function createInitialState(configOverrides = {}, initialPrograms = []) {
   }
 
   // Añade el bloque del sistema operativo al principio.
-  blocks.unshift(osBlock);
+  if (osBlock) blocks.unshift(osBlock);
 
   return Object.freeze({
     schemaVersion: STATE_SCHEMA_VERSION,

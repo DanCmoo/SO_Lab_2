@@ -77,6 +77,7 @@ export function deriveMetrics(state) {
 
   const lastProbeCount = state.lastTrace ? state.lastTrace.probes : 0;
   const lastCompactionBytesMoved = state.lastCompaction ? state.lastCompaction.bytesMoved : 0;
+  const unpartitionedBytes = state.blocks.filter(b => b.kind === BlockKind.UNPARTITIONED).reduce((sum, b) => sum + b.sizeBytes, 0);
 
   return {
     totalMemoryBytes,
@@ -84,6 +85,7 @@ export function deriveMetrics(state) {
     userBytes,
     allocatedProgramBytes,
     freeBytes,
+    unpartitionedBytes,
     internalFragmentationBytes,
     externalFragmentationDetected,
     largestFreeBlockBytes,
