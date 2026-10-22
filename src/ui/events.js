@@ -13,7 +13,8 @@ import {
   recalculateConfigValues,
   recalculateCustomProgramSize
 } from './forms.js';
-import { setStatusBanner } from './render.js';
+import { setStatusBanner, renderApp } from './render.js';
+import { initNoncontiguousUI, renderAttemptTrace } from './noncontiguous.js';
 import { announce } from './accessibility.js';
 import { describeError } from './error-messages.js';
 
@@ -84,13 +85,14 @@ function readConfigFromForm() {
     if (sizesInMiB.some(size => !Number.isFinite(size))) {
       throw new Error('Valor no numérico en "Tamaños desiguales": revisa la lista separada por comas.');
     }
-    unequalPartitionSizes = sizesInMiB.map(size => Math.round(size * MIB));
+    unequalPartitionSizes = sizesInMiB.map(size => parseUnitToBytes(size, 'MiB'));
   }
 
   return {
     mode,
     algorithm,
     osBytes,
+    pageSizeBytes: mode === MemoryMode.PAGING ? Number(elements.selectPageSize.value) : null,
     equalPartitionSizeBytes,
     unequalPartitionSizes
   };
@@ -102,6 +104,7 @@ function readConfigFromForm() {
  * @param {Object} store
  */
 export function initEvents(store) {
+  initNoncontiguousUI(store);
   let pendingResetConfig = null;
 
   // 1. Mode and Algorithm Selectors
@@ -148,12 +151,28 @@ export function initEvents(store) {
   elements.selectEqualUnit.addEventListener('change', recalculateConfigValues);
   elements.inputUnequalSizes.addEventListener('input', recalculateConfigValues);
   elements.inputHeapSize.addEventListener('input', recalculateCustomProgramSize);
+  elements.selectPageSize.addEventListener('change', () => {
+    recalculateConfigValues();
+    if (store.getState().phase === 'RUNNING') {
+      try { pendingResetConfig = readConfigFromForm(); openModal(elements.dialogConfirmReset); }
+      catch (error) { renderApp(store.getState(), store); setStatusBanner({ type: 'error', message: describeError(error) }); }
+    }
+  });
+  elements.btnUndo.addEventListener('click', () => {
+    const result = store.dispatch({ type: 'UNDO' });
+    setStatusBanner({ type: result.ok ? 'success' : 'warning', message: result.ok ? 'Operación deshecha; memoria y tablas restauradas.' : 'No hay operaciones para deshacer.' });
+  });
   elements.inputStackSize.addEventListener('input', recalculateCustomProgramSize);
 
   // 2. Start Simulation & Apply Config
   elements.btnApplyConfig.addEventListener('click', () => {
     try {
       const config = readConfigFromForm();
+      if (store.getState().phase === 'RUNNING') {
+        pendingResetConfig = config;
+        openModal(elements.dialogConfirmReset);
+        return;
+      }
       const res = store.dispatch({ type: 'RESET', config });
       if (res.ok) {
         setStatusBanner({
@@ -175,9 +194,9 @@ export function initEvents(store) {
       if (res.ok) {
         setStatusBanner({
           type: 'success',
-          message: 'Simulación iniciada. La configuración de memoria está bloqueada. Ya puedes asignar programas.'
+          message: 'Simulación iniciada. Ya puedes ejecutar programas. Cambiar la configuración requiere confirmar un reinicio.'
         });
-        announce('Simulación iniciada. Configuración bloqueada.');
+        announce('Simulación iniciada.');
       } else {
         setStatusBanner({ type: 'error', message: `No se puede iniciar la simulación: ${describeError(res)}` });
       }
@@ -264,6 +283,14 @@ export function initEvents(store) {
 
   // Delegated Queue Actions: Allocate & Terminate
   elements.programsPanel.addEventListener('click', e => {
+    const deleteBtn = e.target.closest('.btn-delete-program');
+    if (deleteBtn) {
+      const res = store.dispatch({ type: 'DELETE_PROGRAM', programId: deleteBtn.dataset.id });
+      const message = res.ok ? `Programa ${res.details.name} eliminado del catálogo. Puedes recuperarlo con Deshacer.` : describeError(res);
+      setStatusBanner({ type: res.ok ? 'success' : 'error', message });
+      announce(message);
+      return;
+    }
     const allocBtn = e.target.closest('.btn-allocate');
     if (allocBtn) {
       const progId = allocBtn.getAttribute('data-id');
@@ -280,7 +307,7 @@ export function initEvents(store) {
       } else if (res.code === 'EXTERNAL_FRAGMENTATION') {
         setStatusBanner({
           type: 'warning',
-          message: `Fragmentación externa: la memoria libre total es suficiente, pero ningún hueco individual tiene espacio para ${programName}. ${res.state.config.mode === MemoryMode.DYNAMIC_COMPACTION ? 'La compactación se realiza al terminar un proceso.' : 'Este modo no compacta memoria.'}`
+          message: res.details.regionName ? `No cabe la región ${res.details.regionName} con la estrategia actual. Revisa la traza de los huecos intentados; el proceso no se cargó parcialmente.` : `Fragmentación externa: la memoria libre total es suficiente, pero ningún hueco individual tiene espacio para ${programName}. ${res.state.config.mode === MemoryMode.DYNAMIC_COMPACTION ? 'La compactación se realiza al terminar un proceso.' : 'Este modo no compacta memoria.'}`
         });
         announce(`Fragmentación externa para el programa ${programName}`);
       } else {
@@ -290,6 +317,7 @@ export function initEvents(store) {
         });
         announce(`La asignación de ${programName} falló`);
       }
+      if (!res.ok && res.details?.trace) renderAttemptTrace(res.details.trace);
       return;
     }
 
@@ -299,9 +327,11 @@ export function initEvents(store) {
       const processName = store.getState().programs.find(program => program.id === progId)?.name || progId;
       const res = store.dispatch({ type: 'TERMINATE_PROGRAM', programId: progId });
       if (res.ok) {
+        const mode = res.state.config.mode;
+        const releaseNote = mode === MemoryMode.PAGING ? ' Marcos liberados.' : mode === MemoryMode.SEGMENTATION ? ' Segmentos liberados y huecos adyacentes fusionados.' : mode === MemoryMode.DYNAMIC_NO_COMPACTION ? ' Huecos adyacentes fusionados.' : ' Partición liberada.';
         setStatusBanner({
           type: 'success',
-          message: `Ejecución ${processName} terminada. Memoria de imagen, heap y stack liberada.${res.details.autoCompacted ? ` Compactación automática completada: ${formatBytes(res.details.compactionBytesMoved)} desplazados.` : res.state.config.mode === MemoryMode.DYNAMIC_NO_COMPACTION ? ' Huecos adyacentes fusionados.' : ' Partición liberada.'}`
+          message: `Ejecución ${processName} terminada. Memoria de imagen, heap y stack liberada.${res.details.autoCompacted ? ` Compactación automática completada: ${formatBytes(res.details.compactionBytesMoved)} desplazados.` : releaseNote}`
         });
         announce(`Ejecución ${processName} terminada.${res.details.autoCompacted ? ' Memoria compactada automáticamente.' : ''}`);
       } else {
@@ -323,6 +353,14 @@ export function initEvents(store) {
     btn.addEventListener('click', () => {
       const dialog = btn.closest('dialog');
       if (dialog) closeModal(dialog);
+      if (dialog === elements.dialogConfirmReset) {
+        pendingResetConfig = null;
+        renderApp(store.getState(), store);
+      }
     });
+  });
+  elements.dialogConfirmReset.addEventListener('cancel', () => {
+    pendingResetConfig = null;
+    renderApp(store.getState(), store);
   });
 }

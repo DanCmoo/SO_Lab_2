@@ -4,12 +4,16 @@ import { createProgram, createSimulationConfig } from '../domain/models.js';
 import { createRuntimeRegions } from '../engine/process-memory.js';
 import { DomainError, ErrorCode } from '../domain/errors.js';
 import { nextExecutionNumber } from '../domain/executions.js';
+import { getDefaultPrograms } from '../data/default-programs.js';
+let storageError = null;
+export function getStorageError() { return storageError; }
 
 /** Convierte sesiones anteriores sin alterar el orden ni los límites físicos. */
 function restoreState(parsed) {
-  if (![1, STATE_SCHEMA_VERSION].includes(parsed?.schemaVersion)) {
+  if (![1, 2, STATE_SCHEMA_VERSION].includes(parsed?.schemaVersion)) {
     throw new DomainError(ErrorCode.UNSUPPORTED_SCHEMA, 'Unsupported state schema');
   }
+  if (parsed.schemaVersion === STATE_SCHEMA_VERSION) assertState(parsed);
   const configDraft = { ...parsed.config };
   if (parsed.schemaVersion === 1 && configDraft.mode === 'STATIC_EQUAL') {
     configDraft.equalPartitionSizeBytes = (configDraft.totalBytes - configDraft.osBytes) / configDraft.equalPartitionCount;
@@ -28,13 +32,22 @@ function restoreState(parsed) {
       ...program,
       ...validated,
       name: program.name,
+      segmentTable: program.segmentTable || [],
+      pageTable: program.pageTable || [],
       runtimeRegions: program.status === 'allocated' ? createRuntimeRegions(validated) : Object.freeze([])
     };
   });
   const activePrograms = programs.filter(program => !program.sourceProgramId || program.status === 'allocated').map(program => program.sourceProgramId
     ? program
     : { ...program, nextInstanceNumber: nextExecutionNumber(programs, program) });
-  const state = { ...parsed, schemaVersion: STATE_SCHEMA_VERSION, config, programs: activePrograms };
+  // El catálogo básico pertenece a la aplicación, aunque una sesión antigua
+  // haya persistido una lista vacía o solamente programas personalizados.
+  // Conserva las definiciones y numeración ya guardadas; añade solo faltantes.
+  const existingIds = new Set(activePrograms.map(program => program.id));
+  const removedDefaults = parsed.removedDefaultProgramIds || [];
+  const missingDefaults = getDefaultPrograms().filter(program => !existingIds.has(program.id) && !removedDefaults.includes(program.id))
+    .map(program => ({ ...program, nextInstanceNumber: 1 }));
+  const state = { ...parsed, schemaVersion: STATE_SCHEMA_VERSION, config, programs: [...activePrograms, ...missingDefaults], removedDefaultProgramIds: removedDefaults, frames: parsed.frames || [] };
   assertState(state);
   return state;
 }
@@ -46,7 +59,7 @@ export function exportScenario(state) {
 export function importScenario(json) {
   try {
     const payload = JSON.parse(json);
-    if (![1, STATE_SCHEMA_VERSION].includes(payload?.schemaVersion)) {
+    if (![1, 2, STATE_SCHEMA_VERSION].includes(payload?.schemaVersion)) {
       throw new DomainError(ErrorCode.UNSUPPORTED_SCHEMA, 'Unsupported scenario schema');
     }
     return restoreState(payload.activeState || payload);
@@ -81,6 +94,7 @@ export function saveToStorage(state) {
  * @returns {import('../domain/constants.js').SimulationState|null}
  */
 export function loadFromStorage() {
+  storageError = null;
   if (typeof window === 'undefined' || !window.localStorage) {
     return null;
   }
@@ -90,7 +104,8 @@ export function loadFromStorage() {
 
     const parsed = JSON.parse(raw);
     return restoreState(parsed);
-  } catch (_e) {
+  } catch (error) {
+    storageError = error;
     return null;
   }
 }

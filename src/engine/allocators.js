@@ -1,4 +1,5 @@
 import { AllocationAlgorithm } from '../domain/constants.js';
+import { DomainError, ErrorCode } from '../domain/errors.js';
 
 /**
  * @typedef {Object} InspectedCandidate
@@ -28,6 +29,7 @@ import { AllocationAlgorithm } from '../domain/constants.js';
  * @returns {{ candidate: object|null, probes: number, trace: AllocationTrace }}
  */
 export function selectCandidate(candidates, requestBytes, algorithm = AllocationAlgorithm.FIRST_FIT) {
+  if (!Object.values(AllocationAlgorithm).includes(algorithm)) throw new DomainError(ErrorCode.INVALID_CONFIGURATION, 'Algoritmo no reconocido.');
   if (!candidates || candidates.length === 0) {
     return {
       candidate: null,

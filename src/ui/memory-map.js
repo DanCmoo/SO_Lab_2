@@ -2,6 +2,8 @@ import { TOTAL_MEMORY_BYTES, BlockKind, MemoryMode } from '../domain/constants.j
 import { toHexAddress, formatBytes } from '../domain/address.js';
 import { layoutSegments } from '../engine/compaction.js';
 import { elements } from './elements.js';
+import { renderNoncontiguousMap } from './noncontiguous.js';
+import { escapeHTML } from './safe-html.js';
 
 /**
  * Renderiza el mapa de memoria física de doble carril y su representación tabular accesible.
@@ -10,6 +12,8 @@ import { elements } from './elements.js';
  * @param {(id: string) => void} onSelectBlock
  */
 export function renderMemoryMap(state, onSelectBlock) {
+  if (state.config.mode === MemoryMode.SEGMENTATION || state.config.mode === MemoryMode.PAGING) return renderNoncontiguousMap(state, onSelectBlock);
+  elements.detailedRail.classList.remove('frame-grid');
   const { blocks, programs, partitions, selectedId, config } = state;
   const blockTypeLabels = {
     OS: 'Sistema operativo',
@@ -107,7 +111,7 @@ export function renderMemoryMap(state, onSelectBlock) {
     card.innerHTML = `
       <div class="block-header">
         <div class="block-title">
-          <span>${titleText}</span>
+          <span>${escapeHTML(titleText)}</span>
           <span class="badge badge-ready font-mono">${sizeStr}</span>
         </div>
         <div class="block-range">${startHex} &mdash; ${endHex}</div>
@@ -188,12 +192,12 @@ export function renderMemoryMap(state, onSelectBlock) {
     }
 
     tr.innerHTML = `
-      <td class="font-mono">${block.id}</td>
+      <td class="font-mono">${escapeHTML(block.id)}</td>
       <td>${blockTypeLabels[block.kind] || block.kind}</td>
       <td class="font-mono">${startHex}</td>
       <td class="font-mono">${endHex}</td>
       <td class="font-mono">${sizeStr}</td>
-      <td>${progName}</td>
+      <td>${escapeHTML(progName)}</td>
       <td class="font-mono">${fragStr}</td>
     `;
     tableFragment.appendChild(tr);

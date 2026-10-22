@@ -525,5 +525,30 @@ select option { color: var(--color-text); background: var(--color-surface); }
 }
 
 .execution-empty { font-size: 11px; padding: 6px 0; }
+[hidden] { display: none !important; }
+.mode-help { font-size: 11px; line-height: 1.5; padding: 8px 12px; color: var(--color-muted); overflow-wrap: anywhere; }
+.frame-controls { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 11px; }
+.frame-controls input { width: 90px; }
+.frame-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 4px; align-content: start; }
+.frame-cell { font: 10px var(--font-mono); min-height: 30px; padding: 4px; overflow-wrap: anywhere; }
+.owner-os { background: #424958; }.owner-page { border-color: #759b83; }.owner-free { color: var(--color-muted); }
+.frame-cell.selected, .kind-segment.selected { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+.kind-segment { border-left: 4px solid #759b83; text-align: left; font-size: 12px; }
+.table-scroll { max-height: 260px; overflow: auto; }
+#noncontiguous-tools { font-size: 12px; gap: 8px; }
+#noncontiguous-tools input, #noncontiguous-tools select { width: 100%; margin: 4px 0; }
+#translation-result { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
+#trace-content { font-size: 10px; max-height: 180px; overflow: auto; white-space: pre-wrap; }
+.segment-row { flex-wrap: wrap; }.segment-permissions { display: flex; gap: 8px; }.segment-permissions label { display: flex; align-items: center; gap: 3px; font-size: 11px; }
+.segment-permissions input { width: auto; }
+@media (max-width: 850px) { .frame-grid { grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); } }
+@media (min-width: 1151px) {
+  body { height: 100vh; overflow: hidden; }
+  .simulator-workspace { grid-template-rows: minmax(0, 1fr); }
+  .panel-col { height: 100%; }
+  .panel-card { flex-shrink: 0; }
+  .panel-col-center .memory-map-container { flex-shrink: 1; }
+  .memory-map-rails-wrapper { flex: 1; height: auto; min-height: 80px; }
+}
 .catalog-item .queue-item-info, .execution-item .queue-item-info { min-width: 0; }
 .catalog-item .queue-item-title, .execution-item .queue-item-title { flex-wrap: wrap; }

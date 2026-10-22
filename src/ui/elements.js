@@ -8,6 +8,10 @@ export const elements = {
   btnStartSim: document.getElementById('btn-start-sim'),
   btnCompare: document.getElementById('btn-compare'),
   btnReset: document.getElementById('btn-reset'),
+  btnUndo: document.getElementById('btn-undo'),
+  selectPageSize: document.getElementById('select-page-size'),
+  groupPageConfig: document.getElementById('group-page-config'),
+  modeHelp: document.getElementById('mode-help'),
 
   // Panel de configuración.
   badgeSimPhase: document.getElementById('badge-sim-phase'),

@@ -11,7 +11,7 @@ import { reduceCommand } from '../src/state/commands.js';
 import { createStore } from '../src/state/store.js';
 import { exportScenario, importScenario } from '../src/state/persistence.js';
 
-for (const mode of Object.values(MemoryMode)) {
+for (const mode of [MemoryMode.STATIC_EQUAL, MemoryMode.STATIC_UNEQUAL, MemoryMode.DYNAMIC_NO_COMPACTION, MemoryMode.DYNAMIC_COMPACTION]) {
   test(`Runtime memory: OS reserves and frees heap/stack per process in ${mode}`, () => {
     const initial = createInitialState({ mode }, getDefaultPrograms());
     const ready = initial.programs[0];

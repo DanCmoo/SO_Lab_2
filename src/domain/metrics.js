@@ -1,4 +1,6 @@
 import { BlockKind, MemoryMode, ProgramStatus, TOTAL_MEMORY_BYTES } from './constants.js';
+import { memoryModel } from './memory-mode.js';
+import { deriveNoncontiguousMetrics } from './noncontiguous-metrics.js';
 
 /**
  * Función pura que calcula las métricas de simulación a partir de un estado.
@@ -21,6 +23,15 @@ import { BlockKind, MemoryMode, ProgramStatus, TOTAL_MEMORY_BYTES } from './cons
  * }}
  */
 export function deriveMetrics(state) {
+  memoryModel(state.config.mode);
+  switch (state.config.mode) {
+    case MemoryMode.SEGMENTATION:
+    case MemoryMode.PAGING: return deriveNoncontiguousMetrics(state);
+    case MemoryMode.STATIC_EQUAL:
+    case MemoryMode.STATIC_UNEQUAL:
+    case MemoryMode.DYNAMIC_NO_COMPACTION:
+    case MemoryMode.DYNAMIC_COMPACTION: break;
+  }
   const totalMemoryBytes = TOTAL_MEMORY_BYTES;
   const osBytes = state.config.osBytes;
   const userBytes = totalMemoryBytes - osBytes;

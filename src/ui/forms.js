@@ -1,6 +1,7 @@
 import { MemoryMode, TOTAL_MEMORY_BYTES, MIB, KIB } from '../domain/constants.js';
 import { parseUnitToBytes, formatBytes } from '../domain/address.js';
 import { elements } from './elements.js';
+import { escapeHTML } from './safe-html.js';
 
 /**
  * Actualiza la visibilidad del formulario y calcula los tamaños de partición en tiempo real.
@@ -12,9 +13,10 @@ export function updateConfigFormVisibility(state) {
   const isConfiguring = state.phase === 'CONFIGURING';
 
   // Activa o desactiva el selector de algoritmo según el modo.
-  if (mode === MemoryMode.STATIC_EQUAL) {
+  if (mode === MemoryMode.STATIC_EQUAL || mode === MemoryMode.PAGING) {
     elements.selectAlgorithm.disabled = true;
     elements.selectAlgorithm.title = 'Todas las particiones son iguales; la asignación siempre usa la partición libre de menor dirección';
+    if (mode === MemoryMode.PAGING) elements.selectAlgorithm.title = 'Los marcos tienen igual capacidad; se usan marcos libres en orden ascendente.';
   } else {
     elements.selectAlgorithm.disabled = false;
     elements.selectAlgorithm.title = 'Selecciona la política de asignación';
@@ -33,13 +35,19 @@ export function updateConfigFormVisibility(state) {
   }
 
   // Activa o desactiva los campos según la fase de la simulación.
-  elements.selectMode.disabled = !isConfiguring;
-  elements.inputOsSize.disabled = !isConfiguring;
-  elements.selectOsUnit.disabled = !isConfiguring;
+  elements.selectMode.disabled = false;
+  elements.inputOsSize.disabled = false;
+  elements.selectOsUnit.disabled = false;
+  elements.groupPageConfig.hidden = mode !== MemoryMode.PAGING;
+  elements.selectPageSize.disabled = false;
+  elements.btnCompare.disabled = mode === MemoryMode.PAGING;
+  elements.btnApplyConfig.disabled = false;
+  elements.modeHelp.textContent = mode === MemoryMode.PAGING
+    ? 'Marcos libres en orden ascendente. Todos tienen igual capacidad: primer/mejor/peor ajuste no aplican. Carga completa, tabla de un nivel; sin TLB, demanda ni reemplazo.'
+    : mode === MemoryMode.SEGMENTATION ? 'Cada región se asigna por separado con base, límite y permisos. Carga completa, sin compactación ni crecimiento durante la ejecución.' : '';
   elements.inputEqualSize.disabled = !isConfiguring;
   elements.selectEqualUnit.disabled = !isConfiguring;
   elements.inputUnequalSizes.disabled = !isConfiguring;
-  elements.btnApplyConfig.disabled = !isConfiguring;
 
   recalculateConfigValues();
 }
@@ -59,6 +67,11 @@ export function recalculateConfigValues() {
 
   const userBytes = Math.max(0, TOTAL_MEMORY_BYTES - osBytes);
   const mode = elements.selectMode.value;
+  if (mode === MemoryMode.PAGING) {
+    const Q = Number(elements.selectPageSize.value);
+    elements.modeHelp.textContent = `RAM: 16 MiB · SO: ${formatBytes(osBytes)} · Usuario: ${formatBytes(userBytes)} · ${TOTAL_MEMORY_BYTES / Q} marcos totales · ${osBytes / Q} del SO. Marcos libres en orden ascendente: todos tienen igual capacidad; los ajustes no aplican. Carga completa de un nivel, sin TLB, demanda, reemplazo ni crecimiento. Tablas como metadatos sin coste adicional simulado.`;
+  }
+  if (mode === MemoryMode.SEGMENTATION) elements.modeHelp.textContent = `RAM: 16 MiB · SO: ${formatBytes(osBytes)} · Usuario: ${formatBytes(userBytes)}. Cada región tiene base, límite y permisos. Carga completa, sin compactación, crecimiento ni memoria compartida. La pila usa base inferior y desplazamientos crecientes. Tablas como metadatos sin coste adicional simulado.`;
 
   if (mode === MemoryMode.STATIC_EQUAL) {
     try {
@@ -128,7 +141,7 @@ export function addSegmentRow(name = 'Nuevo segmento', size = 256, unit = 'KiB')
   row.style.alignItems = 'center';
 
   row.innerHTML = `
-    <input type="text" class="seg-name" value="${name}" placeholder="Nombre del segmento" style="flex: 2;" required>
+    <input type="text" class="seg-name" value="${escapeHTML(name)}" placeholder="Nombre del segmento" style="flex: 2;" required>
     <input type="number" class="seg-size" value="${size}" min="1" step="any" style="flex: 1;" required>
     <select class="seg-unit" style="width: 75px;">
       <option value="B" ${unit === 'B' ? 'selected' : ''}>Bytes</option>
@@ -136,6 +149,7 @@ export function addSegmentRow(name = 'Nuevo segmento', size = 256, unit = 'KiB')
       <option value="MiB" ${unit === 'MiB' ? 'selected' : ''}>MiB</option>
     </select>
     <button type="button" class="btn-sm btn-danger btn-remove-seg" title="Eliminar segmento">&times;</button>
+    <span class="segment-permissions">${['read', 'write', 'execute'].map((key, i) => `<label><input type="checkbox" class="seg-${key}" ${key === 'read' || (name === 'Code' ? key === 'execute' : key === 'write') ? 'checked' : ''}>${['R', 'W', 'X'][i]}</label>`).join('')}</span>
   `;
 
   row.querySelector('.seg-name').addEventListener('input', recalculateCustomProgramSize);
@@ -201,6 +215,7 @@ export function getCustomProgramDraft() {
     segments.push({
       id: `SEG-${Date.now()}-${i + 1}`,
       name: segName,
+      permissions: { read: r.querySelector('.seg-read').checked, write: r.querySelector('.seg-write').checked, execute: r.querySelector('.seg-execute').checked },
       sizeBytes
     });
   }

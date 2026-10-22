@@ -33,7 +33,8 @@ export function renderProgramLists(state) {
     }
     info.appendChild(title);
     if (isExecution) {
-      info.appendChild(textElement('div', 'queue-item-sub font-mono', `${program.id} · ${toHexAddress(program.start)} — ${toHexAddress(program.end)}`));
+      const location = state.config.mode === 'SEGMENTATION' ? `${program.segmentTable.length} segmentos` : state.config.mode === 'PAGING' ? `${program.pageTable.length} páginas / marcos` : `${toHexAddress(program.start)} — ${toHexAddress(program.end)}`;
+      info.appendChild(textElement('div', 'queue-item-sub font-mono', `${program.id} · ${location}`));
       info.appendChild(textElement('div', 'queue-item-sub', `${formatBytes(program.sizeBytes)} en memoria`));
     } else {
       const imageSummary = program.segments.map(segment => `${segment.name} ${formatBytes(segment.sizeBytes)}`).join(', ');
@@ -47,11 +48,21 @@ export function renderProgramLists(state) {
     button.disabled = !isRunning;
     if (!isRunning) button.title = 'Inicia la simulación para ejecutar programas';
     actions.appendChild(button);
+    if (!isExecution) {
+      const remove = textElement('button', 'btn-sm btn-danger btn-delete-program', 'Eliminar');
+      remove.type = 'button';
+      remove.dataset.id = program.id;
+      remove.setAttribute('aria-label', `Eliminar programa ${program.name}`);
+      remove.disabled = active.some(process => (process.sourceProgramId || process.id) === program.id);
+      remove.title = remove.disabled ? 'Termina sus ejecuciones activas antes de eliminarlo' : 'Eliminar del catálogo. Puedes recuperarlo con Deshacer';
+      actions.appendChild(remove);
+    }
     item.append(info, actions);
     return item;
   }
 
   elements.queueList.replaceChildren(...catalog.map(program => makeItem(program, false)));
+  if (catalog.length === 0) elements.queueList.appendChild(textElement('p', 'text-muted execution-empty', 'No hay programas disponibles. Crea uno con + Nuevo o restaura los predeterminados.'));
   elements.activeProcessList.replaceChildren(...active.map(program => makeItem(program, true)));
   if (active.length === 0) {
     elements.activeProcessList.appendChild(textElement('p', 'text-muted execution-empty', 'No hay ejecuciones activas.'));

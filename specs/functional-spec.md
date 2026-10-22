@@ -1,9 +1,9 @@
 # Functional Specification: Multiprogrammed Memory Simulator
 
-**Version:** 1.0  
+**Version:** 3.0
 **Status:** Ready for implementation  
 **Target platform:** Modern desktop  
-**Language:** English UI  
+**Language:** Spanish UI
 
 ## 1. Product Definition
 
@@ -14,7 +14,7 @@ The implementation must use Vanilla JavaScript, HTML, and CSS without a frontend
 ## 2. Goals
 
 - Accurately simulate a 24-bit physical address space of 16 MiB.
-- Support four memory-management modes.
+- Support six memory-management modes: four contiguous partition modes, segmentation and paging.
 - Demonstrate the consequences of first fit, best fit, and worst fit where applicable.
 - Show memory allocation at partition, process, and segment levels.
 - Make every state transition observable and reproducible.
@@ -23,7 +23,7 @@ The implementation must use Vanilla JavaScript, HTML, and CSS without a frontend
 
 ## 3. Non-Goals
 
-- Virtual memory, paging, page replacement, segmentation as a non-contiguous allocation scheme, swapping, and CPU scheduling.
+- Demand paging, page replacement, shared segments, segment compaction, runtime growth, swapping, and CPU scheduling.
 - Real operating-system memory inspection.
 - Executing the simulated programs.
 - Multi-user collaboration, authentication, or cloud persistence.
@@ -31,14 +31,13 @@ The implementation must use Vanilla JavaScript, HTML, and CSS without a frontend
 
 ## 4. Assumptions
 
-Because no configuration choices were confirmed, version 1.0 uses these defaults:
+The confirmed configuration and educational conventions use these defaults:
 
 - Total physical memory is fixed at 16 MiB: 16,777,216 bytes.
 - Valid physical addresses are `0x000000` through `0xFFFFFF`, inclusive.
 - The operating system occupies the first 1 MiB by default: `0x000000` through `0x0FFFFF`.
 - The OS reservation is editable before a simulation starts, from 0 bytes up to less than 16 MiB.
-- Programs are allocated contiguously by total size.
-- Program segments are informational subdivisions inside the program's contiguous allocation.
+- In the four partition modes, programs are allocated contiguously by total size and their regions are informational subdivisions. Segmentation assigns regions independently; paging uses logical page tables and potentially noncontiguous physical frames.
 - Program operations are manual and step-based: create, enqueue, allocate, terminate, undo, and reset.
 - In `DYNAMIC_COMPACTION`, termination frees the process and compacts the remaining processes in one transaction. Allocation never triggers compaction. The application reports relocation and bytes moved at termination.
 - All calculations use bytes internally. The UI accepts bytes, KiB, and MiB.
@@ -62,6 +61,8 @@ The mode selector must expose exactly these options:
 2. **Static partitions — unequal size**
 3. **Dynamic partitions — no compaction**
 4. **Dynamic partitions — with compaction**
+5. **Segmentación** — independent regions, base/byte-limit tables, R/W/X permissions and translation.
+6. **Paginación** — full loading, one-level page tables and ascending free-frame allocation.
 
 ### 6.1 Static partitions — equal size
 
@@ -81,7 +82,7 @@ The mode selector must expose exactly these options:
 - The selected allocation algorithm operates over free partitions that can contain the program.
 - Unused space inside the selected partition is internal fragmentation.
 - Partition boundaries never move during a simulation.
-- Partition sizes retain the entered order. Automatic size sorting remains pending explicit user authorization.
+- New static unequal maps sort partition sizes in descending order before assigning consecutive physical addresses after the OS. Input order does not affect placement. Resuming an existing session preserves its physical layout; applying configuration or resetting rebuilds the map in descending order.
 
 ### 6.3 Dynamic partitions — no compaction
 
@@ -103,6 +104,10 @@ The mode selector must expose exactly these options:
 - Undo treats automatic compaction and its triggering termination as one state change.
 
 ## 7. Allocation Algorithms
+
+En segmentación, primer/mejor/peor ajuste operan sobre los huecos antes de colocar cada región en su orden lógico. La carga completa es atómica y un fallo devuelve la traza del segmento que no pudo colocarse. No se reordenan regiones ni se compactan. Una solicitud puede caber sin que exista un hueco para el tamaño total del proceso.
+
+En paginación, cada página ocupa un marco libre de menor número. Los ajustes y su comparación no aplican; se rechazan también por API. El tamaño de página puede ser 1, 2, 4, 8, 16 o 64 KiB, inicialmente 4 KiB. El SO debe estar alineado a ese tamaño. Los marcos se numeran sobre toda la RAM, incluido el SO.
 
 | Mode | First fit | Best fit | Worst fit |
 |---|---:|---:|---:|
@@ -131,6 +136,18 @@ Select the largest suitable candidate. If multiple candidates have equal size, s
 - The event history must record which algorithm was used for every allocation attempt.
 
 ## 8. Program Model
+
+### Modos no contiguos implementados
+
+Cada instancia segmentada tiene una tabla con número de segmento, región, base, límite en bytes y permisos. El traductor exige desplazamiento entero no negativo y estrictamente menor que el límite, comprueba R/W/X y devuelve `base + offset`. El código predeterminado es R-X; datos, heap, pila y regiones personalizadas son RW-. Los permisos de imagen se pueden configurar al crear programas. La pila tiene base inferior y desplazamientos crecientes; no se simula crecimiento.
+
+Cada instancia paginada concatena sus regiones lógicamente, sin redondearlas por separado. Requiere `ceil(tamaño/tamañoPagina)` marcos, aunque estén separados. La tabla contiene página, marco y bytes útiles. El traductor acepta dirección lógica lineal o página/desplazamiento y devuelve `marco * tamañoPagina + offset`. El relleno final es fragmentación interna y no se puede traducir como dirección válida del proceso. No se simulan TLB, demanda ni reemplazo.
+
+Los residentes no contiguos no tienen un rango físico único: se muestran cantidades de segmentos o páginas. La tabla permite localizar la asignación física y el mapa permite consultar a su propietario. Paginación limita cada vista a 256 marcos y 64 filas de tabla, con navegación a cualquier marco. El carril global conserva proporciones físicas exactas.
+
+Terminar elimina todas las asignaciones de la instancia y deshacer restaura sus mismos descriptores/marcos en una operación. Una traducción es una consulta y no consume deshacer. Al desaparecer la instancia o cambiar el modo se limpia su resultado. Los errores de carga muestran la traza del intento rechazado sin alterar el estado ni los contadores.
+
+Las métricas distinguen memoria útil, memoria física, relleno, segmentos y marcos. En paginación no aplica fragmentación externa; las tablas son metadatos sin coste físico adicional. La comparación segmentada parte del estado actual, mantiene sus residentes en cada copia y crea instancias independientes. La persistencia de esquema 3 migra versiones 1 y 2; una sesión incompatible se conserva hasta elegir comenzar de nuevo.
 
 The catalog and runtime executions are separate concepts. Catalog entries keep an **Execute** action and are not themselves loaded by UI commands. Every click creates a new instance with its own ID, addresses, and monotonically increasing per-program execution number, beginning at 1. Only resident instances appear under **Active executions**, with a **Terminate** action. Termination removes the instance from the active state; executing the catalog program later creates a new instance rather than reusing a terminated process. Session restore discards old non-resident child instances while preserving their consumed numbers and any resident addresses.
 

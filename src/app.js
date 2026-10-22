@@ -2,7 +2,7 @@ import { createInitialState } from './domain/models.js';
 import { getDefaultPrograms } from './data/default-programs.js';
 import { createStore } from './state/store.js';
 import { reduceCommand } from './state/commands.js';
-import { loadFromStorage, clearStorage } from './state/persistence.js';
+import { loadFromStorage, clearStorage, getStorageError } from './state/persistence.js';
 import { renderApp } from './ui/render.js';
 import { initEvents } from './ui/events.js';
 import { initKeyboardShortcuts } from './ui/accessibility.js';
@@ -15,7 +15,11 @@ import { elements } from './ui/elements.js';
 function init() {
   const savedState = loadFromStorage();
 
-  if (savedState) {
+  if (savedState || getStorageError()) {
+    if (!savedState) {
+      elements.btnResumeConfirm.disabled = true;
+      elements.dialogResume.querySelector('p').textContent = 'La sesión guardada es incompatible o contiene datos inválidos. Se conserva sin sobrescribirla. Puedes comenzar una simulación nueva.';
+    }
     // Ofrece reanudar la simulación o comenzar de nuevo.
     openModal(elements.dialogResume);
 

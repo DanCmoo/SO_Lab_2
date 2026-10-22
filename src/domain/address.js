@@ -48,7 +48,8 @@ export function toHexAddress(address) {
  * @returns {number}
  */
 export function parseUnitToBytes(value, unit = 'B') {
-  const numericVal = typeof value === 'string' ? parseFloat(value.trim()) : value;
+  const validText = typeof value !== 'string' || /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(value.trim());
+  const numericVal = validText ? (typeof value === 'string' ? Number(value.trim()) : value) : NaN;
   if (!Number.isFinite(numericVal) || Number.isNaN(numericVal) || numericVal <= 0) {
     throw new DomainError(ErrorCode.INVALID_SIZE, 'Size value must be a positive finite number');
   }

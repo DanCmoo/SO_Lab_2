@@ -1,10 +1,30 @@
 # Technical Specification: Multiprogrammed Memory Simulator
 
-**Version:** 1.0  
+**Version:** 3.0
 **Status:** Ready for implementation  
 **Runtime:** Browser, Vanilla JavaScript ES modules  
 
 ## 1. System Overview
+
+### Contratos vigentes de los seis modos (esquema 3)
+
+Los cuatro modos de particiones conservan sus estructuras contiguas. Las secciones posteriores sobre `Program.start/end` y `layoutSegments` describen esos modos. En `SEGMENTATION` y `PAGING`, un residente tiene `start = end = containerId = null`; no calcular sus posiciones desde una base de proceso.
+
+- `config.pageSizeBytes`: uno de 1024, 2048, 4096, 8192, 16384 y 65536 en PAGING; null fuera de ese modo. SO alineado al tamaño de página.
+- `Program.segmentTable`: descriptores `{segmentNumber, regionId, name, kind, base, limitBytes, permissions:{read,write,execute}}`, vacío fuera de segmentación.
+- `Program.pageTable`: entradas `{pageNumber, frameNumber, usedBytes}`, vacío fuera de paginación.
+- `SimulationState.frames`: registros `{frameNumber, ownerKind:'OS'|'FREE'|'PAGE', programId, pageNumber}`, vacío fuera de paginación.
+- `getProcessRegions`: imagen, heap positivo y pila positiva, en ese orden; IDs físicos combinan instancia e identidad de región. Las regiones no se redondean individualmente.
+- `segmentation.js`: asigna cada región en una copia de bloques; publica solo al completar todas. Descriptor y bloque SEGMENT se crean/eliminan juntos. Fallos incluyen traza actual por región, inspecciones, solicitud, hueco mayor y total libre de ese paso. Terminar fusiona huecos sin mover otros residentes.
+- `paging.js`: carga todas las páginas en los marcos libres de menor número. `frames` es canónico; `projectFrames` deriva bloques agrupados de SO/libres y bloques PAGE individuales. La última página registra sus bytes útiles; el resto no es libre. Terminar libera solo los marcos de su propietario.
+- `translation.js`: consultas puras de un byte. Segmentación verifica selector propio, `0 <= offset < limitBytes` y operación R/W/X antes de sumar base. Paginación exige dirección lógica menor que el tamaño útil y calcula marco por tabla. Rechaza relleno, marcos del SO y mapeos de otra instancia.
+- `assertState`: despacho explícito, cobertura completa, IDs únicos, permisos, tablas, propiedad bidireccional, tamaños y proyección. Ningún modo desconocido hereda un motor contiguo (C09).
+- `deriveMetrics`: memoria útil y física separadas; en paginación `física = útil + relleno` y `RAM = SO + física + libre`. Sin indicador basado en un único hueco para procesos segmentados; el fallo real se explica mediante su traza.
+- `compareAlgorithms`: copias desde el estado actual y comandos puros de creación de instancias, con inspecciones del intento actual. Paginación rechaza comparación y cambio de ajuste.
+- `noncontiguous.js`: mapas, tablas y traductor sin cálculo físico duplicado. Máximo 256 botones de marco por vista y 64 filas por tabla; carril proporcional en canvas y navegación por número. Se limpian resultados al cambiar de modo o desaparecer la instancia.
+- Persistencia: esquema 3 con la clave `mms:simulation:v1`; migra 1/2 sin mover residentes antiguos. Esquema 3 valida antes de normalizar, para no ocultar corrupción. Una sesión incompatible no se sobrescribe al leerla.
+
+Las reservas permanecen fijas durante la ejecución, las tablas son metadatos sin coste adicional y no se simulan TLB, demanda, reemplazo, CPU, disco, compartición ni crecimiento. `noncontiguous-types.js` documenta los contratos mediante JSDoc.
 
 The application is a static client-side web application. The simulation domain must remain independent from the DOM so allocation behavior can be unit-tested without a browser UI. The source of truth is an immutable-style `SimulationState`; UI components issue commands, the engine validates and reduces those commands into a new state, and the renderer projects that state into the interface.
 
@@ -13,8 +33,8 @@ No framework, server, database, build-time dependency, or network connection is 
 ## 2. Technical Constraints
 
 - HTML5, CSS3, and modern Vanilla JavaScript.
-- Native ECMAScript modules using `import` and `export`.[cite:77][cite:82]
-- Exact integer byte arithmetic using JavaScript `Number`; 16,777,216 is far below `Number.MAX_SAFE_INTEGER`.[cite:79][cite:81]
+- Native ECMAScript modules using `import` and `export`.
+- Exact integer byte arithmetic using JavaScript `Number`; 16,777,216 is far below `Number.MAX_SAFE_INTEGER`.
 - No floating-point memory values after input conversion.
 - No external UI or state-management libraries.
 - No inline event-handler attributes.
@@ -32,7 +52,7 @@ export const TOTAL_MEMORY_BYTES = 16 * MIB;       // 16,777,216
 export const MIN_ADDRESS = 0x000000;
 export const MAX_ADDRESS = 0xFFFFFF;
 export const DEFAULT_OS_BYTES = 1 * MIB;
-export const STATE_SCHEMA_VERSION = 1;
+export const STATE_SCHEMA_VERSION = 3;
 ```
 
 Invariant:
@@ -257,7 +277,7 @@ All candidate arrays must initially be sorted by ascending `start`.
 
 ## 9. Allocation Policies
 
-First fit returns the first address-ordered candidate large enough. Best fit returns the smallest adequate candidate. Worst fit returns the largest adequate candidate.[cite:50][cite:97]
+First fit returns the first address-ordered candidate large enough. Best fit returns the smallest adequate candidate. Worst fit returns the largest adequate candidate.
 
 ```js
 export function selectCandidate(candidates, requestBytes, algorithm) {
@@ -334,12 +354,13 @@ Clear the partition's `programId`; reset the program's physical addresses and se
 
 - Validate every partition size as a positive safe integer.
 - Validate `sum(partitionSizes) === TOTAL_MEMORY_BYTES - osBytes`.
+- In `createInitialState`, sort a copy of the validated sizes in descending order and store that order in the new state's configuration. Configuration validation and persistence restoration do not reorder existing layouts.
 - Create address-ordered partitions contiguously after the OS region.
 
 Default partition vector:
 
 ```js
-[1 * MIB, 2 * MIB, 3 * MIB, 4 * MIB, 5 * MIB]
+[5 * MIB, 4 * MIB, 3 * MIB, 2 * MIB, 1 * MIB]
 ```
 
 ### 11.2 Allocation
@@ -437,7 +458,7 @@ export function coalesce(blocks) {
 }
 ```
 
-Coalescing adjacent free regions is required to avoid retaining unnecessary external fragments.[cite:50]
+Coalescing adjacent free regions is required to avoid retaining unnecessary external fragments.
 
 ## 13. Compaction Engine
 
@@ -645,7 +666,7 @@ Exported scenario:
 
 ```json
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "exportedAt": "ISO-8601 timestamp",
   "config": {},
   "programs": [],
@@ -724,7 +745,7 @@ The detailed interactive map may enforce a CSS minimum height for usability. It 
 }
 ```
 
-If external fonts are unavailable, system fallbacks must preserve functionality. Text contrast must meet WCAG AA; normal text requires at least 4.5:1, while large text requires at least 3:1.[cite:85][cite:86]
+If external fonts are unavailable, system fallbacks must preserve functionality. Text contrast must meet WCAG AA; normal text requires at least 4.5:1, while large text requires at least 3:1.
 
 ## 23. Default Program Data
 
@@ -896,7 +917,7 @@ For generated valid command sequences:
 
 - Every functional acceptance criterion has an automated test or documented manual test.
 - All state invariants pass after valid command sequences.
-- The four modes produce correct and distinguishable behavior.
+- All six modes produce correct and distinguishable behavior; unknown modes fail explicitly (C09).
 - First, best, and worst fit pass deterministic fixtures.
 - Five default programs and their segment distributions are present.
 - All addresses remain within `0x000000–0xFFFFFF`.

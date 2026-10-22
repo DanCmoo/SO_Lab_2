@@ -8,10 +8,14 @@ import {
   BlockKind,
   SimulationPhase,
   DEFAULT_STATIC_EQUAL_SIZE,
-  DEFAULT_STATIC_UNEQUAL_SIZES
+  DEFAULT_STATIC_UNEQUAL_SIZES,
+  PAGE_SIZES, DEFAULT_PAGE_SIZE
 } from './constants.js';
 import { endAddress } from './address.js';
 import { DomainError, ErrorCode } from './errors.js';
+import { memoryModel } from './memory-mode.js';
+import { regionPermissions } from './process-regions.js';
+import { createFrames, projectFrames } from './paging-layout.js';
 
 /**
  * Crea un segmento validado.
@@ -21,7 +25,7 @@ import { DomainError, ErrorCode } from './errors.js';
  * @param {number} params.sizeBytes
  * @returns {import('./constants.js').Segment}
  */
-export function createSegment({ id, name, sizeBytes }) {
+export function createSegment({ id, name, sizeBytes, permissions }) {
   if (!id || typeof id !== 'string') {
     throw new DomainError(ErrorCode.INVALID_PROGRAM, 'Segment id is required');
   }
@@ -35,6 +39,7 @@ export function createSegment({ id, name, sizeBytes }) {
   return Object.freeze({
     id,
     name: cleanName,
+    permissions: regionPermissions(cleanName, permissions),
     sizeBytes
   });
 }
@@ -81,6 +86,7 @@ export function createProgram({
     createSegment({
       id: seg.id || `${id}-SEG-${idx + 1}`,
       name: seg.name,
+      permissions: seg.permissions,
       sizeBytes: seg.sizeBytes
     })
   );
@@ -116,6 +122,8 @@ export function createProgram({
     imageSizeBytes,
     runtimeMemory: Object.freeze({ heapBytes, stackBytes }),
     runtimeRegions: Object.freeze([]),
+    segmentTable: Object.freeze([]),
+    pageTable: Object.freeze([]),
     sizeBytes: totalSize,
     status,
     arrivalOrder,
@@ -155,7 +163,7 @@ export function createPartition({ id, start, sizeBytes, programId = null }) {
  * @param {string|null} [params.programId=null]
  * @returns {import('./constants.js').MemoryBlock}
  */
-export function createMemoryBlock({ id, kind, start, sizeBytes, programId = null }) {
+export function createMemoryBlock({ id, kind, start, sizeBytes, programId = null, regionId }) {
   if (!Object.values(BlockKind).includes(kind)) {
     throw new DomainError(ErrorCode.STATE_INVARIANT_FAILED, `Invalid block kind: ${kind}`);
   }
@@ -163,6 +171,7 @@ export function createMemoryBlock({ id, kind, start, sizeBytes, programId = null
   return Object.freeze({
     id,
     kind,
+    ...(regionId !== undefined ? { regionId } : {}),
     start,
     sizeBytes,
     end,
@@ -176,8 +185,10 @@ export function createMemoryBlock({ id, kind, start, sizeBytes, programId = null
  * @returns {import('./constants.js').SimulationConfig}
  */
 export function createSimulationConfig(overrides = {}) {
-  const mode = overrides.mode || MemoryMode.STATIC_EQUAL;
-  const algorithm = overrides.algorithm || AllocationAlgorithm.FIRST_FIT;
+  const mode = overrides.mode === undefined ? MemoryMode.STATIC_EQUAL : overrides.mode;
+  memoryModel(mode);
+  const algorithm = overrides.algorithm === undefined ? AllocationAlgorithm.FIRST_FIT : overrides.algorithm;
+  if (!Object.values(AllocationAlgorithm).includes(algorithm)) throw new DomainError(ErrorCode.INVALID_CONFIGURATION, 'Algoritmo no reconocido.');
   const totalBytes = TOTAL_MEMORY_BYTES;
   const osBytes = overrides.osBytes ?? DEFAULT_OS_BYTES;
 
@@ -189,6 +200,10 @@ export function createSimulationConfig(overrides = {}) {
   }
 
   const userBytes = totalBytes - osBytes;
+  const pageSizeBytes = mode === MemoryMode.PAGING ? overrides.pageSizeBytes ?? DEFAULT_PAGE_SIZE : null;
+  if (mode === MemoryMode.PAGING && (!PAGE_SIZES.includes(pageSizeBytes) || osBytes % pageSizeBytes !== 0)) {
+    throw new DomainError(ErrorCode.INVALID_CONFIGURATION, 'El tamaño de página debe ser 1, 2, 4, 8, 16 o 64 KiB y la reserva del SO debe ser múltiplo de ese tamaño.');
+  }
 
   let equalPartitionCount = null;
   let equalPartitionSizeBytes = null;
@@ -229,6 +244,7 @@ export function createSimulationConfig(overrides = {}) {
     algorithm,
     totalBytes,
     osBytes,
+    pageSizeBytes,
     equalPartitionSizeBytes,
     equalPartitionCount,
     unequalPartitionSizes: Object.freeze(unequalPartitionSizes)
@@ -242,7 +258,15 @@ export function createSimulationConfig(overrides = {}) {
  * @returns {import('./constants.js').SimulationState}
  */
 export function createInitialState(configOverrides = {}, initialPrograms = []) {
-  const config = createSimulationConfig(configOverrides);
+  const validatedConfig = createSimulationConfig(configOverrides);
+  // Ordena al construir un mapa nuevo. Validar o restaurar una sesión existente
+  // no debe cambiar las direcciones de particiones y procesos ya guardados.
+  const config = validatedConfig.mode === MemoryMode.STATIC_UNEQUAL
+    ? Object.freeze({
+      ...validatedConfig,
+      unequalPartitionSizes: Object.freeze([...validatedConfig.unequalPartitionSizes].sort((a, b) => b - a))
+    })
+    : validatedConfig;
   const osBlock = config.osBytes > 0 ? createMemoryBlock({
     id: 'BLOCK-OS',
     kind: BlockKind.OS,
@@ -306,7 +330,7 @@ export function createInitialState(configOverrides = {}, initialPrograms = []) {
       );
       cursor = p.end + 1;
     });
-  } else {
+  } else if ([MemoryMode.DYNAMIC_NO_COMPACTION, MemoryMode.DYNAMIC_COMPACTION, MemoryMode.SEGMENTATION, MemoryMode.PAGING].includes(config.mode)) {
     // Modos dinámicos: un único hueco inicial que cubre toda la memoria de usuario si hay espacio.
     const userBytes = config.totalBytes - config.osBytes;
     if (userBytes > 0) {
@@ -324,14 +348,18 @@ export function createInitialState(configOverrides = {}, initialPrograms = []) {
 
   // Añade el bloque del sistema operativo al principio.
   if (osBlock) blocks.unshift(osBlock);
+  const frames = config.mode === MemoryMode.PAGING ? createFrames(config) : [];
+  if (config.mode === MemoryMode.PAGING) blocks = projectFrames(frames, config.pageSizeBytes);
 
   return Object.freeze({
     schemaVersion: STATE_SCHEMA_VERSION,
     phase: SimulationPhase.CONFIGURING,
     config,
     programs: Object.freeze([...initialPrograms]),
+    removedDefaultProgramIds: Object.freeze([]),
     partitions: Object.freeze(partitions),
     blocks: Object.freeze(blocks),
+    frames: Object.freeze(frames),
     nextSequence: 1,
     selectedId: null,
     lastTrace: null,

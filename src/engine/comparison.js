@@ -1,6 +1,8 @@
-import { AllocationAlgorithm } from '../domain/constants.js';
+import { AllocationAlgorithm, MemoryMode } from '../domain/constants.js';
 import { allocate } from './simulator.js';
 import { deriveMetrics } from '../domain/metrics.js';
+import { reduceCommand } from '../state/commands.js';
+import { DomainError, ErrorCode } from '../domain/errors.js';
 
 /**
  * Ejecuta una comparación aislada entre primer, mejor y peor ajuste
@@ -22,6 +24,7 @@ import { deriveMetrics } from '../domain/metrics.js';
  * }>}
  */
 export function compareAlgorithms(baseState, programIds) {
+  if (baseState.config.mode === MemoryMode.PAGING) throw new DomainError(ErrorCode.COMPARISON_NOT_ALLOWED, 'Los marcos tienen igual capacidad; no se comparan ajustes.');
   const algorithms = [
     AllocationAlgorithm.FIRST_FIT,
     AllocationAlgorithm.BEST_FIT,
@@ -32,7 +35,7 @@ export function compareAlgorithms(baseState, programIds) {
   const targetIds =
     programIds ||
     baseState.programs
-      .filter(p => p.status === 'ready')
+      .filter(p => !p.sourceProgramId)
       .sort((a, b) => a.arrivalOrder - b.arrivalOrder)
       .map(p => p.id);
 
@@ -49,15 +52,17 @@ export function compareAlgorithms(baseState, programIds) {
 
     for (const progId of targetIds) {
       try {
-        const result = allocate(clone, progId, algo);
-        clone = result.state;
-        allocatedCount++;
-        totalProbes += result.trace?.probes || 1;
+        const result = reduceCommand(clone, { type: 'ALLOCATE_PROGRAM', programId: progId });
+        if (!result.ok) {
+          rejectedCount++;
+          totalProbes += result.details.trace?.probes || 0;
+        } else {
+          clone = result.state;
+          allocatedCount++;
+          totalProbes += result.details.probes || 0;
+        }
       } catch (_err) {
         rejectedCount++;
-        if (clone.lastTrace?.probes) {
-          totalProbes += clone.lastTrace.probes;
-        }
       }
     }
 

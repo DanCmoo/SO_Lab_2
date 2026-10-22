@@ -1,7 +1,7 @@
-import { SimulationPhase, ProgramStatus } from '../domain/constants.js';
+import { SimulationPhase, ProgramStatus, MemoryMode, AllocationAlgorithm } from '../domain/constants.js';
 import { DomainError, ErrorCode } from '../domain/errors.js';
 import { createProgram, createInitialState, createSimulationConfig } from '../domain/models.js';
-import { getDefaultPrograms } from '../data/default-programs.js';
+import { getDefaultPrograms, DEFAULT_PROGRAM_DEFS } from '../data/default-programs.js';
 import { allocate, terminate } from '../engine/simulator.js';
 import { nextExecutionNumber } from '../domain/executions.js';
 
@@ -26,12 +26,14 @@ export function reduceCommand(state, command) {
           ...p,
           status: ProgramStatus.READY,
           runtimeRegions: Object.freeze([]),
+          segmentTable: [], pageTable: [],
           start: null,
           end: null,
           containerId: null
         })));
         const newState = {
           ...freshInitial,
+          removedDefaultProgramIds: state.removedDefaultProgramIds || [],
           phase: SimulationPhase.RUNNING,
           nextSequence: state.nextSequence
         };
@@ -44,6 +46,8 @@ export function reduceCommand(state, command) {
       }
 
       case 'SET_ALGORITHM': {
+        if (state.config.mode === MemoryMode.PAGING) throw new DomainError(ErrorCode.COMPARISON_NOT_ALLOWED, 'Paginación usa marcos libres en orden ascendente.');
+        if (!Object.values(AllocationAlgorithm).includes(command.algorithm)) throw new DomainError(ErrorCode.INVALID_CONFIGURATION, 'Algoritmo no reconocido.');
         const newState = {
           ...state,
           config: {
@@ -79,13 +83,29 @@ export function reduceCommand(state, command) {
         });
         const newState = {
           ...state,
-          programs: Object.freeze([...state.programs, newProg])
+          programs: Object.freeze([...state.programs, newProg]),
+          removedDefaultProgramIds: (state.removedDefaultProgramIds || []).filter(removedId => removedId !== id)
         };
         return {
           ok: true,
           state: newState,
           code: 'PROGRAM_CREATED',
           details: { programId: newProg.id, name: newProg.name, sizeBytes: newProg.sizeBytes }
+        };
+      }
+
+      case 'DELETE_PROGRAM': {
+        const program = state.programs.find(p => p.id === command.programId);
+        if (!program || program.sourceProgramId) throw new DomainError(ErrorCode.INVALID_PROGRAM, 'Solo se pueden eliminar programas del catálogo.');
+        if (program.status === ProgramStatus.ALLOCATED || state.programs.some(p => p.sourceProgramId === program.id && p.status === ProgramStatus.ALLOCATED)) {
+          throw new DomainError(ErrorCode.PROGRAM_IN_USE, 'Termina las ejecuciones activas de este programa antes de eliminarlo.');
+        }
+        const removed = new Set(state.removedDefaultProgramIds || []);
+        if (DEFAULT_PROGRAM_DEFS.some(p => p.id === program.id)) removed.add(program.id);
+        return {
+          ok: true,
+          state: { ...state, programs: state.programs.filter(p => p.id !== program.id), removedDefaultProgramIds: [...removed] },
+          code: 'PROGRAM_DELETED', details: { programId: program.id, name: program.name }
         };
       }
 
@@ -111,6 +131,7 @@ export function reduceCommand(state, command) {
           instanceNumber,
           status: ProgramStatus.READY,
           runtimeRegions: Object.freeze([]),
+          segmentTable: [], pageTable: [],
           start: null,
           end: null,
           containerId: null,
@@ -164,6 +185,7 @@ export function reduceCommand(state, command) {
         const freshState = createInitialState(resetConfig, state.programs.filter(p => !p.sourceProgramId).map(p => ({
           ...p,
           status: 'ready',
+          segmentTable: [], pageTable: [],
           runtimeRegions: Object.freeze([]),
           start: null,
           end: null,
@@ -171,7 +193,7 @@ export function reduceCommand(state, command) {
         })));
         return {
           ok: true,
-          state: freshState,
+          state: { ...freshState, removedDefaultProgramIds: state.removedDefaultProgramIds || [] },
           code: 'SIMULATION_RESET',
           details: { mode: resetConfig.mode }
         };
@@ -188,7 +210,8 @@ export function reduceCommand(state, command) {
         const defaultPrograms = getDefaultPrograms();
         const newState = {
           ...state,
-          programs: Object.freeze(defaultPrograms)
+          programs: Object.freeze(defaultPrograms),
+          removedDefaultProgramIds: []
         };
         return {
           ok: true,

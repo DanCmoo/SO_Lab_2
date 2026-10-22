@@ -5,14 +5,16 @@ export const TOTAL_MEMORY_BYTES = 16 * MIB; // 16,777,216 bytes
 export const MIN_ADDRESS = 0x000000;
 export const MAX_ADDRESS = 0xFFFFFF;
 export const DEFAULT_OS_BYTES = 1 * MIB;
-export const STATE_SCHEMA_VERSION = 2;
+export const STATE_SCHEMA_VERSION = 3;
 export const STORAGE_KEY = 'mms:simulation:v1';
 
 export const MemoryMode = Object.freeze({
   STATIC_EQUAL: 'STATIC_EQUAL',
   STATIC_UNEQUAL: 'STATIC_UNEQUAL',
   DYNAMIC_NO_COMPACTION: 'DYNAMIC_NO_COMPACTION',
-  DYNAMIC_COMPACTION: 'DYNAMIC_COMPACTION'
+  DYNAMIC_COMPACTION: 'DYNAMIC_COMPACTION',
+  SEGMENTATION: 'SEGMENTATION',
+  PAGING: 'PAGING'
 });
 
 export const AllocationAlgorithm = Object.freeze({
@@ -33,7 +35,9 @@ export const BlockKind = Object.freeze({
   PARTITION: 'PARTITION',
   PROCESS: 'PROCESS',
   HOLE: 'HOLE',
-  UNPARTITIONED: 'UNPARTITIONED'
+  UNPARTITIONED: 'UNPARTITIONED',
+  SEGMENT: 'SEGMENT',
+  PAGE: 'PAGE'
 });
 
 export const SimulationPhase = Object.freeze({
@@ -42,6 +46,8 @@ export const SimulationPhase = Object.freeze({
 });
 
 export const DEFAULT_STATIC_EQUAL_SIZE = 3 * MIB;
+export const PAGE_SIZES = Object.freeze([1024, 2048, 4096, 8192, 16384, 65536]);
+export const DEFAULT_PAGE_SIZE = 4096;
 export const DEFAULT_STATIC_UNEQUAL_SIZES = Object.freeze([
   1 * MIB,
   2 * MIB,

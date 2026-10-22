@@ -45,9 +45,9 @@ test('Static Unequal: allocates according to algorithm policy', () => {
     programs
   );
 
-  // P1 (2 MiB) con mejor ajuste debe elegir PART-2 (2 MiB), sin fragmentación interna.
+  // El mapa es descendente: P1 cabe exactamente en PART-4 (2 MiB).
   const result = allocateStaticUnequal(state, 'P1');
-  assert.equal(result.partitionId, 'PART-2');
+  assert.equal(result.partitionId, 'PART-4');
   assert.equal(result.internalFragmentationBytes, 0);
   assert.doesNotThrow(() => assertState(result.state));
 });
@@ -75,9 +75,34 @@ test('Static Equal: rejects invalid sizes and keeps the chosen size when OS memo
   assertState(createInitialState({ osBytes: 0, equalPartitionSizeBytes: 4 * MIB }));
 });
 
-test('Static Unequal: preserves explicitly entered order pending approval of sorting', () => {
-  const sizes = [4, 2, 1, 3, 5].map(size => size * MIB);
-  const state = createInitialState({ mode: MemoryMode.STATIC_UNEQUAL, unequalPartitionSizes: sizes });
-  assert.deepEqual(state.partitions.map(p => p.sizeBytes), sizes);
+test('Static Unequal: builds a descending physical map with repeated sizes without mutating input', () => {
+  const sizes = [4, 2, 1, 3, 4].map(size => size * MIB);
+  const expected = [4, 4, 3, 2, 1].map(size => size * MIB);
+  const state = createInitialState({ mode: MemoryMode.STATIC_UNEQUAL, osBytes: 2 * MIB, unequalPartitionSizes: sizes });
+  assert.deepEqual(sizes, [4, 2, 1, 3, 4].map(size => size * MIB));
+  assert.deepEqual(state.config.unequalPartitionSizes, expected);
+  assert.deepEqual(state.partitions.map(p => p.sizeBytes), expected);
+  assert.deepEqual(state.blocks.filter(b => b.kind === 'PARTITION').map(b => b.sizeBytes), expected);
+  let cursor = 2 * MIB;
+  for (const part of state.partitions) {
+    assert.equal(part.start, cursor);
+    assert.equal(part.end, cursor + part.sizeBytes - 1);
+    cursor = part.end + 1;
+  }
+  assert.equal(cursor, 16 * MIB);
   assertState(state);
+});
+
+test('Static Unequal: descending layout preserves fit policies and search costs', () => {
+  const state = createInitialState({ mode: MemoryMode.STATIC_UNEQUAL }, getDefaultPrograms());
+  for (const [algorithm, partitionId, probes] of [
+    [AllocationAlgorithm.FIRST_FIT, 'PART-1', 1],
+    [AllocationAlgorithm.BEST_FIT, 'PART-4', 5],
+    [AllocationAlgorithm.WORST_FIT, 'PART-1', 5]
+  ]) {
+    const result = allocateStaticUnequal(state, 'P1', algorithm);
+    assert.equal(result.partitionId, partitionId);
+    assert.equal(result.trace.probes, probes);
+    assertState(result.state);
+  }
 });

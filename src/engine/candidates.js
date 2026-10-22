@@ -1,4 +1,6 @@
 import { BlockKind, MemoryMode } from '../domain/constants.js';
+import { memoryModel } from '../domain/memory-mode.js';
+import { DomainError, ErrorCode } from '../domain/errors.js';
 
 /**
  * Extrae candidatos de asignación normalizados a partir de un estado.
@@ -9,6 +11,8 @@ import { BlockKind, MemoryMode } from '../domain/constants.js';
  */
 export function extractCandidates(state) {
   const { config, partitions, blocks } = state;
+  memoryModel(config.mode);
+  if (config.mode === MemoryMode.PAGING) throw new DomainError(ErrorCode.INVALID_CONFIGURATION, 'Paginación asigna marcos, no candidatos contiguos.');
 
   if (config.mode === MemoryMode.STATIC_EQUAL || config.mode === MemoryMode.STATIC_UNEQUAL) {
     return partitions

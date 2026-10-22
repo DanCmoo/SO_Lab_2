@@ -4,9 +4,12 @@ import {
   MAX_ADDRESS,
   MemoryMode,
   ProgramStatus,
-  BlockKind
+  BlockKind, AllocationAlgorithm
 } from './constants.js';
 import { DomainError, ErrorCode } from './errors.js';
+import { memoryModel } from './memory-mode.js';
+import { assertPaged, assertSegmented } from './noncontiguous-invariants.js';
+import { regionPermissions } from './process-regions.js';
 
 /**
  * Comprueba todas las invariantes globales y específicas del modo de un estado.
@@ -19,6 +22,16 @@ export function assertState(state) {
   }
 
   const { config, programs, partitions, blocks } = state;
+  const removedDefaults = state.removedDefaultProgramIds ?? [];
+  if (!Array.isArray(removedDefaults) || removedDefaults.some(id => typeof id !== 'string' || !id) || new Set(removedDefaults).size !== removedDefaults.length || programs.some(p => removedDefaults.includes(p.id))) {
+    throw new DomainError(ErrorCode.STATE_INVARIANT_FAILED, 'Registro de programas eliminados inválido.');
+  }
+  memoryModel(config.mode);
+  const noncontiguous = config.mode === MemoryMode.SEGMENTATION || config.mode === MemoryMode.PAGING;
+  if (!Object.values(AllocationAlgorithm).includes(config.algorithm)) throw new DomainError(ErrorCode.STATE_INVARIANT_FAILED, 'Algoritmo desconocido.');
+  if (new Set(programs.map(p => p.id)).size !== programs.length || new Set(blocks.map(b => b.id)).size !== blocks.length) throw new DomainError(ErrorCode.STATE_INVARIANT_FAILED, 'IDs duplicados.');
+  if (programs.some(p => typeof p.id !== 'string' || !p.id) || blocks.some(b => typeof b.id !== 'string' || !b.id)) throw new DomainError(ErrorCode.STATE_INVARIANT_FAILED, 'Las identidades deben ser cadenas no vacías.');
+  if (!noncontiguous && ((state.frames || []).length || programs.some(p => p.segmentTable?.length || p.pageTable?.length))) throw new DomainError(ErrorCode.STATE_INVARIANT_FAILED, 'Tablas/marcos en un modo contiguo.');
 
   // 1. Invariantes de configuración.
   if (config.totalBytes !== TOTAL_MEMORY_BYTES) {
@@ -54,6 +67,9 @@ export function assertState(state) {
   let calculatedSum = 0;
   for (let i = 0; i < blocks.length; i++) {
     const block = blocks[i];
+    if (block.kind === BlockKind.OS && (block.start !== 0 || block.sizeBytes !== config.osBytes || block.programId !== null)) throw new DomainError(ErrorCode.STATE_INVARIANT_FAILED, 'Reserva del SO alterada.');
+    if ([BlockKind.OS, BlockKind.HOLE, BlockKind.UNPARTITIONED].includes(block.kind) && block.programId !== null) throw new DomainError(ErrorCode.STATE_INVARIANT_FAILED, 'Memoria libre o del SO con propietario.');
+    if (!noncontiguous && ![BlockKind.OS, BlockKind.HOLE, BlockKind.PARTITION, BlockKind.PROCESS, BlockKind.UNPARTITIONED].includes(block.kind)) throw new DomainError(ErrorCode.STATE_INVARIANT_FAILED, 'Tipo de bloque ajeno al modo contiguo.');
     if (!Number.isSafeInteger(block.start) || !Number.isSafeInteger(block.sizeBytes) || !Number.isSafeInteger(block.end)) {
       throw new DomainError(ErrorCode.STATE_INVARIANT_FAILED, `Block ${block.id} has non-safe-integer bounds`);
     }
@@ -95,6 +111,13 @@ export function assertState(state) {
   // 3. Invariantes de los programas.
   const allocatedPrograms = new Set();
   for (const prog of programs) {
+    if (!Object.values(ProgramStatus).includes(prog.status)) throw new DomainError(ErrorCode.STATE_INVARIANT_FAILED, 'Estado de proceso inválido.');
+    if (prog.sourceProgramId && !programs.some(p => p.id === prog.sourceProgramId && !p.sourceProgramId)) throw new DomainError(ErrorCode.STATE_INVARIANT_FAILED, 'Instancia sin plantilla.');
+    if (new Set(prog.segments.map(s => s.id)).size !== prog.segments.length) throw new DomainError(ErrorCode.STATE_INVARIANT_FAILED, 'IDs de segmentos duplicados.');
+    for (const segment of prog.segments) {
+      if (!Number.isSafeInteger(segment.sizeBytes) || segment.sizeBytes <= 0) throw new DomainError(ErrorCode.STATE_INVARIANT_FAILED, 'Tamaño de región inválido.');
+      regionPermissions(segment.name, segment.permissions);
+    }
     const segmentSum = prog.segments.reduce((acc, s) => acc + s.sizeBytes, 0);
     if ([prog.runtimeMemory?.heapBytes ?? 0, prog.runtimeMemory?.stackBytes ?? 0].some(bytes => !Number.isSafeInteger(bytes) || bytes < 0)) {
       throw new DomainError(ErrorCode.STATE_INVARIANT_FAILED, `Invalid runtime memory request for ${prog.id}`);
@@ -116,10 +139,12 @@ export function assertState(state) {
       }
       allocatedPrograms.add(prog.id);
 
-      if (prog.start === null || prog.end === null) {
+      if (noncontiguous) {
+        if (prog.start !== null || prog.end !== null || prog.containerId !== null) throw new DomainError(ErrorCode.STATE_INVARIANT_FAILED, 'Un proceso no contiguo no tiene un único intervalo físico.');
+      } else if (prog.start === null || prog.end === null) {
         throw new DomainError(ErrorCode.STATE_INVARIANT_FAILED, `Allocated program ${prog.id} missing start/end addresses`);
       }
-      if (prog.end !== prog.start + prog.sizeBytes - 1) {
+      if (!noncontiguous && prog.end !== prog.start + prog.sizeBytes - 1) {
         throw new DomainError(ErrorCode.STATE_INVARIANT_FAILED, `Allocated program ${prog.id} address span mismatch`);
       }
       const regions = prog.runtimeRegions || [];
@@ -147,6 +172,7 @@ export function assertState(state) {
 
   // 4. Invariantes específicas del modo.
   if (config.mode === MemoryMode.STATIC_EQUAL || config.mode === MemoryMode.STATIC_UNEQUAL) {
+    if (blocks.some(b => ![BlockKind.OS, BlockKind.PARTITION, ...(config.mode === MemoryMode.STATIC_EQUAL ? [BlockKind.UNPARTITIONED] : [])].includes(b.kind))) throw new DomainError(ErrorCode.STATE_INVARIANT_FAILED, 'Representación ajena a particiones estáticas.');
     if (config.mode === MemoryMode.STATIC_EQUAL && partitions.some(part => part.sizeBytes !== config.equalPartitionSizeBytes)) {
       throw new DomainError(ErrorCode.STATE_INVARIANT_FAILED, 'Equal partitions must have the configured size');
     }
@@ -193,7 +219,12 @@ export function assertState(state) {
         );
       }
     }
-  } else {
+  } else if (config.mode === MemoryMode.SEGMENTATION) {
+    assertSegmented(state);
+  } else if (config.mode === MemoryMode.PAGING) {
+    assertPaged(state);
+  } else if (config.mode === MemoryMode.DYNAMIC_NO_COMPACTION || config.mode === MemoryMode.DYNAMIC_COMPACTION) {
+    if (partitions.length || blocks.some(b => ![BlockKind.OS, BlockKind.HOLE, BlockKind.PROCESS].includes(b.kind))) throw new DomainError(ErrorCode.STATE_INVARIANT_FAILED, 'Representación ajena a particiones dinámicas.');
     // Modos dinámicos.
     // Comprueba que no haya huecos adyacentes.
     for (let i = 0; i < blocks.length - 1; i++) {

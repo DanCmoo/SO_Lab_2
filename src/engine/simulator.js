@@ -3,6 +3,9 @@ import { allocateStaticEqual, terminateStatic } from './static-equal.js';
 import { allocateStaticUnequal } from './static-unequal.js';
 import { allocateDynamic, terminateDynamic } from './dynamic.js';
 import { canCompactMemory, compactMemory } from './compaction.js';
+import { memoryModel } from '../domain/memory-mode.js';
+import { allocateSegmented, terminateSegmented } from './segmentation.js';
+import { allocatePaged, terminatePaged } from './paging.js';
 
 /**
  * Fachada unificada para asignar un programa en cualquier modo de gestión de memoria.
@@ -20,16 +23,16 @@ import { canCompactMemory, compactMemory } from './compaction.js';
  */
 export function allocate(state, programId, algorithmOverride) {
   const mode = state.config.mode;
+  memoryModel(mode);
 
-  if (mode === MemoryMode.STATIC_EQUAL) {
-    return allocateStaticEqual(state, programId);
+  switch (mode) {
+    case MemoryMode.STATIC_EQUAL: return allocateStaticEqual(state, programId);
+    case MemoryMode.STATIC_UNEQUAL: return allocateStaticUnequal(state, programId, algorithmOverride);
+    case MemoryMode.DYNAMIC_NO_COMPACTION:
+    case MemoryMode.DYNAMIC_COMPACTION: return allocateDynamic(state, programId, algorithmOverride);
+    case MemoryMode.SEGMENTATION: return allocateSegmented(state, programId, algorithmOverride);
+    case MemoryMode.PAGING: return allocatePaged(state, programId);
   }
-
-  if (mode === MemoryMode.STATIC_UNEQUAL) {
-    return allocateStaticUnequal(state, programId, algorithmOverride);
-  }
-
-  return allocateDynamic(state, programId, algorithmOverride);
 }
 
 /**
@@ -41,6 +44,10 @@ export function allocate(state, programId, algorithmOverride) {
  */
 export function terminate(state, programId) {
   const mode = state.config.mode;
+  memoryModel(mode);
+
+  if (mode === MemoryMode.SEGMENTATION) return terminateSegmented(state, programId);
+  if (mode === MemoryMode.PAGING) return terminatePaged(state, programId);
 
   if (mode === MemoryMode.STATIC_EQUAL || mode === MemoryMode.STATIC_UNEQUAL) {
     return terminateStatic(state, programId);

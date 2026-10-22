@@ -1,6 +1,6 @@
 # Simulador de memoria multiprogramada
 
-Aplicación web educativa para visualizar la asignación contigua de memoria y comparar algoritmos de ubicación de procesos. Se ejecuta en el navegador y no necesita frameworks ni dependencias externas.
+Aplicación web educativa para visualizar particiones contiguas, segmentación y paginación, traducir direcciones y comparar algoritmos de ubicación cuando corresponden. Se ejecuta en el navegador y no necesita frameworks ni dependencias externas.
 
 ## Integrantes
 
@@ -41,13 +41,28 @@ La aplicación guarda el estado de la simulación en el almacenamiento local del
 - Modos de particiones estáticas iguales o desiguales y particiones dinámicas con o sin compactación. Las particiones iguales se configuran por tamaño (B, KiB o MiB); la cantidad se calcula automáticamente y cualquier remanente se muestra como memoria sin particionar, no asignable.
 - Algoritmos de asignación First Fit, Best Fit y Worst Fit cuando corresponden.
 - Asignación y terminación de programas predeterminados o personalizados.
+- El catálogo permite eliminar programas predeterminados y personalizados sin ejecuciones activas. Deshacer recupera el programa; la eliminación se conserva al reanudar o reiniciar. El botón Predeterminados recupera los cinco programas básicos.
 - El catálogo de **Programas disponibles** conserva el botón **Ejecutar**. Cada clic crea una instancia nueva (`#1`, `#2`, `#3`, etc.) mientras haya memoria disponible. **Ejecuciones activas** muestra esas instancias con su botón **Terminar**; al terminar salen del listado y liberan su memoria. La numeración continúa sin reutilizar ejecuciones terminadas, también al reanudar la sesión.
 - Visualización del mapa de memoria, métricas, direcciones, imagen del programa y reservas de ejecución de cada proceso.
 - Heap y stack se solicitan al SO por separado de la imagen del programa. El SO reserva esas regiones al asignar cada proceso y las libera al terminarlo; cuentan como memoria del proceso, sin consumir la reserva del núcleo. Los tamaños permanecen fijos durante la ejecución en este modelo contiguo: no se simulan paginación, demanda de páginas ni llamadas a malloc/free.
 - Compactación automática al terminar un proceso en el modo dinámico con compactación. Los procesos restantes conservan su orden y la memoria libre queda en un único hueco final. Añadir o asignar programas no compacta.
-- Las particiones desiguales conservan el orden ingresado. Ordenarlas por tamaño es una modificación pendiente de autorización.
+- Al construir un mapa de particiones estáticas desiguales, los tamaños se ordenan de mayor a menor después del SO, independientemente del orden ingresado. Reanudar una sesión conserva su distribución guardada; aplicar una nueva configuración o reiniciar construye el mapa con orden descendente.
 - Comparación de algoritmos y persistencia de la sesión en el navegador.
 - Las sesiones de la versión anterior se convierten al modelo actual al reanudarlas, conservando direcciones, tamaños y orden de las particiones.
+
+## Segmentación y paginación
+
+El selector incluye seis modos. **Segmentación** asigna Code, Data y las reservas de Heap y Stack independientemente; cada instancia tiene una tabla de segmentos con base física, límite en bytes y permisos R/W/X. El traductor acepta segmento, desplazamiento decimal o hexadecimal y operación. El desplazamiento válido es menor que el límite. No se compactan segmentos ni se simula crecimiento de la pila.
+
+**Paginación** carga el proceso completo en los marcos libres de menor número, aunque estén separados. El tamaño inicial es 4 KiB; se ofrecen 1, 2, 4, 8, 16 y 64 KiB. La reserva del SO debe ser múltiplo del tamaño de página. Con la configuración inicial hay 4096 marcos: 256 del SO y 3840 de usuario. Los ajustes no aplican, por lo que algoritmo y comparación quedan deshabilitados.
+
+En **Tablas y traducción de direcciones**, selecciona una instancia. Puedes localizar su segmento/marco desde la tabla o introducir una dirección lógica lineal, o un par página/desplazamiento. El resultado muestra la fórmula y resalta la asignación física. El relleno de la última página se cuenta como fragmentación interna y no es una dirección lógica válida. Los errores no terminan procesos ni consumen deshacer.
+
+El mapa paginado muestra hasta 256 marcos por vista y las tablas hasta 64 filas. Usa **Ir al marco**, los controles de navegación o **Ver** en una fila para localizar cualquier marco, incluso con páginas de 1 KiB. El carril global mantiene la escala proporcional. Las instancias no contiguas muestran cantidades de segmentos/páginas, sin inventar un rango físico único.
+
+**Deshacer** restaura la instancia y sus tablas/marcos en una sola operación. Cambiar de modo o aplicar una configuración durante la ejecución requiere confirmar reinicio; cancelar conserva la sesión. La persistencia usa esquema 3 y migra versiones 1 y 2 con la misma clave de almacenamiento. Una sesión incompatible se conserva hasta que elijas empezar de nuevo.
+
+Simplificaciones: carga completa, tabla de páginas de un nivel, tamaños fijos y una referencia de un byte por traducción. Las tablas son metadatos sin bytes físicos adicionales. Se excluyen TLB, demanda, reemplazo, memoria compartida, CPU y disco. No se genera informe final ni sustentación.
 
 ## Cómo está organizado el proyecto
 

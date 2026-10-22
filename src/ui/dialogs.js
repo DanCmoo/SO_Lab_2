@@ -37,6 +37,7 @@ export function openAlgorithmComparison(state) {
   const [firstFit, bestFit, worstFit] = comparisonResults;
 
   const tableHtml = `
+    <p>Comparación desde el estado actual. Cada copia conserva los residentes iniciales y ejecuta una nueva instancia de cada programa del catálogo.</p>
     <div style="overflow-x: auto;">
       <table class="accessible-table" style="width: 100%;">
         <thead>

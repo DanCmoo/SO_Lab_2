@@ -17,6 +17,7 @@ export function describeError(source, context = {}) {
   const code = source?.code;
   const details = source?.details || {};
   const technicalMessage = details.error || source?.message || '';
+  if (['INSUFFICIENT_FRAMES', 'ACCESS_DENIED', 'INVALID_SELECTOR', 'INVALID_LOGICAL_ADDRESS', 'INVALID_OPERATION', 'COMPARISON_NOT_ALLOWED'].includes(code)) return technicalMessage || 'La operación no es válida en el modo o dirección seleccionados.';
   const programLabel = context.programId || details.programId || 'seleccionado';
 
   if (technicalMessage === 'Valor no numérico en "Tamaños desiguales": revisa la lista separada por comas.') {
@@ -24,6 +25,7 @@ export function describeError(source, context = {}) {
   }
 
   if (code === ErrorCode.INVALID_CONFIGURATION) {
+    if (/página|múltiplo|no reconocido|no implementado/.test(technicalMessage)) return technicalMessage;
     const unequalSizes = /Sum of unequal partitions \((\d+) bytes\) must exactly match available user memory \((\d+) bytes\)/.exec(technicalMessage);
     if (unequalSizes) {
       const [, assignedBytes, availableBytes] = unequalSizes.map(Number);
@@ -49,6 +51,8 @@ export function describeError(source, context = {}) {
   }
 
   switch (code) {
+    case ErrorCode.PROGRAM_IN_USE:
+      return 'Termina las ejecuciones activas de este programa antes de eliminarlo del catálogo.';
     case ErrorCode.INVALID_SIZE:
       return 'El tamaño indicado no es válido. Introduce un número positivo y una unidad admitida (B, KiB o MiB), sin fracciones de byte.';
     case ErrorCode.INVALID_PROGRAM:

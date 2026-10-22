@@ -6,6 +6,8 @@ import { renderMemoryMap } from './memory-map.js';
 import { updateConfigFormVisibility } from './forms.js';
 import { elements } from './elements.js';
 import { renderProgramLists } from './program-list.js';
+import { renderNoncontiguousTools, renderAttemptTrace, syncCommittedTrace } from './noncontiguous.js';
+import { escapeHTML } from './safe-html.js';
 
 /**
  * Coordinador principal que proyecta el estado de la simulación en el DOM.
@@ -37,6 +39,7 @@ export function renderApp(state, store) {
   if (config.mode === MemoryMode.STATIC_UNEQUAL) {
     elements.inputUnequalSizes.value = config.unequalPartitionSizes.map(size => size / MIB).join(', ');
   }
+  if (config.mode === MemoryMode.PAGING) elements.selectPageSize.value = config.pageSizeBytes;
 
   if (isRunning) {
     elements.btnStartSim.textContent = 'En ejecución';
@@ -55,6 +58,7 @@ export function renderApp(state, store) {
 
   // 3. Proyecta por separado el catálogo y las ejecuciones activas.
   renderProgramLists(state);
+  renderNoncontiguousTools(state);
 
   // 4. Renderiza el mapa visualizador de memoria.
   renderMemoryMap(state, blockId => {
@@ -72,6 +76,15 @@ export function renderApp(state, store) {
   elements.metricResidentCount.textContent = `${metrics.residentProgramCount}`;
   elements.metricProbes.textContent = `${metrics.lastProbeCount}`;
   elements.metricCompactionBytes.textContent = formatBytes(metrics.lastCompactionBytesMoved);
+  elements.metricAllocated.previousElementSibling.textContent = ['SEGMENTATION', 'PAGING'].includes(config.mode) ? 'Memoria útil residente' : 'Memoria asignada';
+  elements.metricLargestHole.previousElementSibling.textContent = config.mode === MemoryMode.PAGING ? 'Capacidad de un marco libre' : 'Mayor hueco libre';
+  elements.metricFreeCount.previousElementSibling.textContent = config.mode === MemoryMode.PAGING ? 'Marcos libres' : 'Huecos/particiones libres';
+  if (config.mode === MemoryMode.SEGMENTATION || config.mode === MemoryMode.PAGING) {
+    elements.metricCompactionBytes.textContent = 'No aplica';
+    syncCommittedTrace(state);
+    return;
+  }
+  renderAttemptTrace(null);
 
   // 6. Renderiza el inspector del bloque seleccionado.
   if (selectedId) {
@@ -100,7 +113,7 @@ export function renderApp(state, store) {
                 .map(
                   s => `
                 <li style="font-size: 0.8rem; background: var(--color-surface-strong); padding: 4px 8px; border-radius: 4px; display: flex; flex-direction: column; gap: 2px;">
-                  <span><strong>${s.name}</strong> (${formatBytes(s.sizeBytes)})${s.allocatedBy === 'OS' ? ` · Reserva del SO · ${s.growth === 'down' ? 'crece hacia direcciones menores' : 'crece hacia direcciones mayores'}` : ' · Imagen del programa'}</span>
+                  <span><strong>${escapeHTML(s.name)}</strong> (${formatBytes(s.sizeBytes)})${s.allocatedBy === 'OS' ? ` · Reserva del SO · ${s.growth === 'down' ? 'crece hacia direcciones menores' : 'crece hacia direcciones mayores'}` : ' · Imagen del programa'}</span>
                   <span class="font-mono text-muted" style="word-break: break-all;">${toHexAddress(s.start)} — ${toHexAddress(s.end)}</span>
                 </li>
               `
@@ -113,7 +126,7 @@ export function renderApp(state, store) {
 
       elements.inspectorContent.innerHTML = `
         <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem;">
-          <div><strong>ID del bloque:</strong> <span class="font-mono">${block.id}</span></div>
+          <div><strong>ID del bloque:</strong> <span class="font-mono">${escapeHTML(block.id)}</span></div>
           <div><strong>Tipo de bloque:</strong> <span class="badge badge-ready">${block.kind}</span></div>
           <div><strong>Dirección inicial:</strong> <span class="font-mono">${toHexAddress(block.start)}</span></div>
           <div><strong>Dirección final:</strong> <span class="font-mono">${toHexAddress(block.end)}</span></div>
@@ -121,7 +134,7 @@ export function renderApp(state, store) {
           ${block.kind === BlockKind.UNPARTITIONED ? '<div>Remanente menor que una partición completa. No se puede asignar en este modo.</div>' : ''}
           ${
             residentProg
-              ? `<div><strong>Programa asignado:</strong> ${residentProg.name} (${residentProg.id})</div>`
+              ? `<div><strong>Programa asignado:</strong> ${escapeHTML(residentProg.name)} (${escapeHTML(residentProg.id)})</div>`
               : ''
           }
           ${

@@ -26,6 +26,8 @@
           <option value="STATIC_UNEQUAL">Particiones estáticas — tamaño desigual</option>
           <option value="DYNAMIC_NO_COMPACTION">Particiones dinámicas — sin compactación</option>
           <option value="DYNAMIC_COMPACTION">Particiones dinámicas — con compactación</option>
+          <option value="SEGMENTATION">Segmentación</option>
+          <option value="PAGING">Paginación</option>
         </select>
       </div>
 
@@ -42,6 +44,7 @@
         <button id="btn-start-sim" class="btn-primary" type="button">Iniciar simulación</button>
         <button id="btn-compare" type="button" title="Comparar primer, mejor y peor ajuste">Comparar</button>
         <button id="btn-reset" class="btn-danger" type="button" title="Reiniciar simulación">Reiniciar</button>
+        <button id="btn-undo" type="button">Deshacer</button>
       </div>
     </div>
   </header>
@@ -86,9 +89,15 @@
           <div id="group-unequal-config" class="form-field" style="display: none;">
             <label for="input-unequal-sizes">Tamaños desiguales (MiB separados por comas):</label>
             <input id="input-unequal-sizes" type="text" value="1, 2, 3, 4, 5">
+            <small class="text-muted">Al aplicar, las particiones se ubican de mayor a menor después del SO.</small>
             <small id="txt-unequal-calc" class="font-mono text-muted">Suma: 15 MiB / 15 MiB</small>
           </div>
 
+          <div id="group-page-config" class="form-field" hidden>
+            <label for="select-page-size">Tamaño de página:</label>
+            <select id="select-page-size"><option value="1024">1 KiB</option><option value="2048">2 KiB</option><option value="4096" selected>4 KiB</option><option value="8192">8 KiB</option><option value="16384">16 KiB</option><option value="65536">64 KiB</option></select>
+          </div>
+          <p id="mode-help" class="mode-help"></p>
           <button id="btn-apply-config" class="btn-sm" type="button">Aplicar a la memoria</button>
         </form>
       </section>
@@ -129,6 +138,12 @@
           <div id="status-actions"></div>
         </div>
 
+        <div id="frame-controls" class="frame-controls" hidden>
+          <label for="input-frame-number">Ir al marco:</label><input id="input-frame-number" type="number" min="0" value="256">
+          <button id="btn-frame-go" type="button">Localizar marco</button><button id="btn-frame-prev" type="button">256 anteriores</button><button id="btn-frame-next" type="button">256 siguientes</button>
+          <span id="frame-range" class="font-mono"></span>
+        </div>
+        <small class="text-muted">Escala global proporcional · Vista detallada ampliada para seleccionar bloques</small>
         <!-- Dual Rail Visualizer -->
         <div class="memory-map-rails-wrapper">
           <!-- Left Rail: True Proportional Scale -->
@@ -213,6 +228,26 @@
         </div>
       </section>
 
+      <p id="metric-mode-summary" class="mode-help"></p>
+      <section id="noncontiguous-tools" class="panel-card" hidden aria-label="Tablas y traductor">
+        <h3>Tablas y traducción de direcciones</h3>
+        <label for="translate-instance">Instancia residente:</label><select id="translate-instance"></select>
+        <div class="table-scroll"><table class="accessible-table"><caption id="mapping-caption">Tabla de la instancia</caption><thead id="mapping-head"></thead><tbody id="mapping-body"></tbody></table></div>
+        <div class="header-btns"><button id="btn-table-prev" type="button">Filas anteriores</button><button id="btn-table-next" type="button">Filas siguientes</button><span id="table-range"></span></div>
+        <div id="segment-translation">
+          <label for="translate-segment">Segmento:</label><select id="translate-segment"></select>
+          <label for="translate-operation">Operación:</label><select id="translate-operation"><option value="READ">Lectura (R)</option><option value="WRITE">Escritura (W)</option><option value="EXECUTE">Ejecución (X)</option></select>
+        </div>
+        <div id="page-translation">
+          <label for="translate-format">Formato lógico:</label><select id="translate-format"><option value="linear">Dirección lineal</option><option value="pair">Página y desplazamiento</option></select>
+          <div id="linear-input"><label for="translate-logical">Dirección lógica (decimal o hexadecimal):</label><input id="translate-logical" value="0" type="text"></div>
+          <div id="pair-input"><label for="translate-page">Página:</label><input id="translate-page" value="0" type="text"></div>
+        </div>
+        <div id="offset-input"><label for="translate-offset">Desplazamiento (decimal o hexadecimal):</label><input id="translate-offset" value="0" type="text"></div>
+        <button id="btn-translate" type="button">Traducir dirección</button>
+        <output id="translation-result" aria-live="polite"></output>
+      </section>
+      <section id="trace-panel" class="panel-card" hidden><h3>Traza del último intento de carga</h3><pre id="trace-content"></pre></section>
       <!-- Selected Block Inspector Card -->
       <section class="panel-card" id="sec-inspector" aria-labelledby="heading-inspector">
         <div class="panel-card-header">
@@ -254,7 +289,7 @@
         <input id="input-heap-size" type="number" min="0" step="any" value="256" required>
         <label for="input-stack-size">Reserva de stack (KiB):</label>
         <input id="input-stack-size" type="number" min="0" step="any" value="256" required>
-        <small class="text-muted">El SO reserva estas regiones para cada proceso al asignarlo y las libera al terminarlo. Pertenecen a la memoria del proceso. Esta simulación contigua mantiene fijos los tamaños solicitados.</small>
+        <small class="text-muted">El SO reserva estas regiones para cada proceso al asignarlo y las libera al terminarlo. Pertenecen a la memoria del proceso. Los tamaños permanecen fijos durante la ejecución.</small>
       </fieldset>
 
       <div style="margin-top: 12px; font-weight: 600;">

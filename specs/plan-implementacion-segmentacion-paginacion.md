@@ -48,7 +48,7 @@ Las convenciones de implementación que siguen concretan ese modelo. Si necesita
 
 ## 2. Estado real del repositorio al preparar este plan
 
-La revisión se realizó sobre los archivos de trabajo del 21 de octubre de 2026, incluyendo cambios locales sin confirmar. Se ejecutó `node --test "tests/*.test.js"`: **60 pruebas aprobadas, 0 fallidas**. Esto verifica la base actual; no significa que los métodos nuevos estén implementados ni que la interfaz haya sido validada en navegador en esta sesión.
+La revisión inicial se realizó sobre los archivos de trabajo del 21 de octubre de 2026, incluyendo cambios locales sin confirmar. La revisión posterior de los comentarios se contrastó contra el commit `b8da5e4`, con el árbol de trabajo limpio antes de editar este plan. Se volvió a ejecutar `node --test "tests/*.test.js"`: **60 pruebas aprobadas, 0 fallidas**. Esto verifica la base actual; no significa que los métodos nuevos estén implementados ni que la interfaz haya sido validada en navegador en esta sesión.
 
 ### 2.1 Base reutilizable
 
@@ -67,15 +67,15 @@ La revisión se realizó sobre los archivos de trabajo del 21 de octubre de 2026
 1. Hoy los segmentos son subdivisiones de **un bloque contiguo de proceso**. Añadir etiquetas a ese bloque no implementa segmentación.
 2. No existen marcos, tabla de páginas ni motor de paginación.
 3. `Program.start/end`, `containerId`, las invariantes y los renderizadores presuponen un único intervalo físico por residente. Esa premisa no sirve para los nuevos modos.
-4. `simulator.js` envía por defecto a asignación dinámica cualquier modo que no sea estático. Sustituir este despacho implícito por casos explícitos para evitar que un modo nuevo use el motor equivocado.
-5. `metrics.js` trata todo modo no estático como dinámico. Necesita ramas propias para los dos modos nuevos.
+4. `simulator.js`, `metrics.js` e `invariants.js` tratan «no estático» como sinónimo de «dinámico» en **cuatro puntos de tres archivos**: `allocate()` y `terminate()` en `simulator.js`, la clasificación `isStatic` de `deriveMetrics()` en `metrics.js`, y la condición de invariantes específicas del modo en `assertState()` de `invariants.js`. Sus `return`/`else` implícitos absorberían silenciosamente `SEGMENTATION` y `PAGING` con el motor, la contabilidad o las invariantes de particiones dinámicas. Sustituir los cuatro por un `switch` exhaustivo o ramas explícitas con rechazo final para cualquier modo sin implementación es **condición de entrada a la Fase 1**, no un detalle de estilo. No basta validar que el valor pertenece a `MemoryMode`: cada operación debe decidir explícitamente qué implementación corresponde a cada modo. Mantener el contrato actual de compactación: solo al terminar un proceso en `DYNAMIC_COMPACTION`; asignar nunca compacta.
+5. El mismo supuesto aparece en `createInitialState()` de `models.js` y `extractCandidates()` de `candidates.js`; además, `createSimulationConfig()` no rechaza modos desconocidos. Incluir estos puntos en la revisión de despacho y validación inicial para que añadir una constante no active una representación o un asignador contiguo por defecto. Las métricas e invariantes de los dos modos nuevos necesitan ramas propias, no reutilizar sin adaptación las reglas dinámicas existentes.
 6. `layoutSegments` de `compaction.js` se usa desde la interfaz y calcula posiciones contiguas. No reutilizarlo para inventar las posiciones de los nuevos modos.
 7. `compareAlgorithms` utiliza asignación de bajo nivel y puede reutilizar registros del catálogo; sus inspecciones fallidas pueden quedar mal contadas. Para segmentación debe invocar la misma semántica de creación de instancias y capturar la traza del intento actual.
 8. La versión vigente de estado es **2**, aunque partes de `specs/technical-spec.md` todavía muestran 1. La clave de almacenamiento sigue siendo `mms:simulation:v1`: el sufijo de la clave no es el número de esquema.
 9. Las especificaciones antiguas declaran los métodos nuevos fuera de alcance, muestran inglés como idioma e incluyen reglas de particiones iguales desactualizadas. El código actual permite remanente no particionado; no convertir esa regla en una prohibición.
 10. Las especificaciones mencionan un historial de eventos y `history.js` que no existen como tales en la aplicación revisada. No dar por implementada una bitácora; para este alcance basta la traza visible del último intento y el deshacer existente.
 
-Hay numerosos archivos modificados y archivos nuevos sin seguimiento. **Preserva ese trabajo.** No restaures archivos, limpies el repositorio ni reviertas cambios ajenos. Registra el estado inicial y vuelve a ejecutar la base de pruebas antes de editar. Un cambio de rama o un commit no es condición para implementar.
+La revisión inicial encontró numerosos archivos modificados y archivos nuevos sin seguimiento; ese trabajo ya figura en el commit contrastado. Al implementar, vuelve a inspeccionar el estado real y **preserva cualquier trabajo local que encuentres**. No restaures archivos, limpies el repositorio ni reviertas cambios ajenos. Registra el estado inicial y vuelve a ejecutar la base de pruebas antes de editar. Un cambio de rama o un commit no es condición para implementar.
 
 ## 3. Modelo académico y convenciones
 
@@ -421,6 +421,9 @@ Usar `node:test`, como el repositorio, sin incorporar un framework de pruebas. L
 | C06 | Reiniciar/cambiar de modo/cancelar | Sin tablas ni selección residuales; cancelar no modifica la sesión |
 | C07 | Entradas inválidas | Rechazar tipos/enum/tamaños/direcciones inválidos; aceptar 0 solo donde corresponde |
 | C08 | Regresión | Las 60 pruebas base siguen aprobadas; no reemplazarlas por aserciones más débiles |
+| C09 | Exhaustividad de despacho | Recorrer todos los valores de `MemoryMode` contra `allocate()`, `terminate()`, `deriveMetrics()` y `assertState()`, con fixtures válidos y resultados propios de cada modo. `SEGMENTATION` y `PAGING` nunca deben usar por defecto las ramas de particiones estáticas o dinámicas. Un modo desconocido debe rechazarse explícitamente sin modificar el estado. |
+
+**C09 se verifica en dos momentos.** Antes de entrar a la Fase 1, probar los cuatro modos vigentes y el rechazo explícito de un modo desconocido en las cuatro operaciones; mientras segmentación y paginación no tengan implementación, tampoco deben ejecutar rutas contiguas. Al integrar los motores nuevos, ampliar la misma prueba para cubrir los seis valores reales de `MemoryMode`. Usar `Object.values(MemoryMode)` y expectativas explícitas por modo: una futura séptima constante debe exigir un caso y una expectativa nuevos, no heredar una rama predeterminada. No limitar la prueba a «no lanza»: comprobar representación/asignación, liberación, contabilidad e invariantes que distingan cada método; incluir estados o solicitudes cuya interpretación contigua produzca un resultado distinto o inválido. Verificar también el rechazo de configuraciones y candidatos de modos desconocidos en los puntos adicionales de la sección 2.2.
 
 ### 11.2 Segmentación
 
@@ -486,11 +489,11 @@ Agregar pruebas nuevas, por ejemplo: `segmentation.test.js`, `paging.test.js`, `
 
 | Fase | Trabajo | Condición para avanzar |
 | --- | --- | --- |
-| 0 | Revisar instrucciones/cambios locales, ejecutar base y leer módulos afectados | Estado inicial identificado, sin trabajo ajeno sobrescrito |
-| 1 | Constantes, configuración, adaptador de regiones, permisos y formas de estado | Modelos válidos de los seis modos; pruebas de configuración |
+| 0 | Revisar instrucciones/cambios locales, ejecutar base, leer módulos afectados y eliminar los despachos implícitos señalados en 2.2 | Estado inicial identificado, sin trabajo ajeno sobrescrito; C09 en su etapa de cuatro modos y rechazo explícito aprobado antes de añadir los modos nuevos |
+| 1 | Constantes, configuración, adaptador de regiones, permisos y formas de estado | Modelos válidos de los seis modos; pruebas de configuración; modos pendientes de motor rechazados explícitamente, sin rutas contiguas por defecto |
 | 2 | Motor de segmentación, tabla, trazas, límites y permisos | S01-S06 aprobados, incluida reversión del fallo parcial |
 | 3 | Motor de paginación, marcos, tablas y traductor | P01-P07 aprobados, incluida carga no contigua |
-| 4 | Despacho, comandos, invariantes, métricas, instancias y deshacer | C01-C08 e invariantes de operaciones aprobados |
+| 4 | Integrar los seis casos explícitos de despacho, comandos, invariantes, métricas, instancias y deshacer | C01-C09 e invariantes de operaciones aprobados; C09 ampliado a los seis modos |
 | 5 | Persistencia/migración y comparación segmentada | I01-I03 aprobados; sesiones antiguas conservadas |
 | 6 | Controles, mapas, tablas, trazas y traductor en interfaz | U01-U04 verificados en navegador |
 | 7 | Documentación, regresión completa y revisión del cambio | Criterios finales completos y resultados reportados |
@@ -502,6 +505,7 @@ Los motores y sus cálculos deben quedar verificables sin navegador antes de con
 El agente no debe declarar terminado el laboratorio solo porque se dibujan páginas o segmentos. Debe comprobar:
 
 - Los seis modos existen y los cuatro anteriores conservan su comportamiento.
+- C09 demuestra que carga, terminación, métricas e invariantes usan el caso explícito de cada modo, y que un modo desconocido falla sin modificar el estado; ningún modo nuevo hereda una ruta contigua por defecto.
 - La segmentación usa asignación física por región, no un bloque de proceso disfrazado.
 - La paginación usa tabla y marcos realmente no contiguos cuando corresponde.
 - Los cinco programas y las ejecuciones múltiples están disponibles y consumen memoria privada correcta.

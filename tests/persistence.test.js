@@ -4,10 +4,42 @@ import { MIB, MemoryMode, STATE_SCHEMA_VERSION } from '../src/domain/constants.j
 import { createInitialState } from '../src/domain/models.js';
 import { getDefaultPrograms } from '../src/data/default-programs.js';
 import { allocate } from '../src/engine/simulator.js';
-import { importScenario, exportScenario } from '../src/state/persistence.js';
+import { importScenario, exportScenario, loadFromStorage, saveToStorage } from '../src/state/persistence.js';
 import { assertState } from '../src/domain/invariants.js';
 import { reduceCommand } from '../src/state/commands.js';
 import { createStore } from '../src/state/store.js';
+
+test('Persistence: restores missing basic programs without replacing custom programs or resident executions', () => {
+  for (const mode of Object.values(MemoryMode)) {
+    const store = createStore(createInitialState({ mode }, getDefaultPrograms().slice(0, 1)), reduceCommand);
+    assert.equal(store.dispatch({ type: 'CREATE_PROGRAM', payload: {
+      id: 'CUSTOM', name: 'Personalizado', segments: [{ name: 'Code', sizeBytes: MIB }]
+    } }).ok, true);
+    assert.equal(store.dispatch({ type: 'ALLOCATE_PROGRAM', programId: 'P1' }).ok, true);
+    const before = structuredClone(store.getState());
+    let raw = JSON.stringify(before);
+    globalThis.window = { localStorage: { getItem: () => raw, setItem: (_key, value) => { raw = value; } } };
+    try {
+      for (const restored of [loadFromStorage(), importScenario(exportScenario(before))]) {
+        for (const basic of getDefaultPrograms()) assert.equal(restored.programs.filter(p => p.id === basic.id).length, 1);
+        for (const existing of before.programs) assert.deepEqual(restored.programs.find(p => p.id === existing.id), {
+          ...existing, ...(!existing.sourceProgramId ? { nextInstanceNumber: existing.nextInstanceNumber || 1 } : {})
+        });
+        assert.deepEqual(restored.blocks, before.blocks);
+        assert.deepEqual(restored.frames, before.frames);
+        assertState(restored);
+        assert.equal(saveToStorage(restored), true);
+        assert.deepEqual(loadFromStorage().programs, restored.programs);
+      }
+    } finally { delete globalThis.window; }
+  }
+});
+
+test('Persistence: an empty saved catalog recovers the five basic programs', () => {
+  const restored = importScenario(exportScenario(createInitialState({}, [])));
+  assert.deepEqual(restored.programs.map(p => p.id), ['P1', 'P2', 'P3', 'P4', 'P5']);
+  assert.ok(restored.programs.every(p => p.status === 'ready'));
+});
 
 test('Persistence: migrates count-based sessions and runtime segments without changing addresses', () => {
   const state = allocate(createInitialState({}, getDefaultPrograms()), 'P1').state;
@@ -40,8 +72,36 @@ test('Persistence: unequal partition order survives round trip', () => {
   const sizes = [4, 2, 1, 3, 5].map(size => size * MIB);
   const state = createInitialState({ mode: MemoryMode.STATIC_UNEQUAL, unequalPartitionSizes: sizes }, getDefaultPrograms());
   const restored = importScenario(exportScenario(state));
-  assert.deepEqual(restored.config.unequalPartitionSizes, sizes);
+  assert.deepEqual(restored.config.unequalPartitionSizes, [5, 4, 3, 2, 1].map(size => size * MIB));
   assert.deepEqual(restored.blocks, state.blocks);
+});
+
+test('Persistence: resuming an older unequal layout preserves addresses; reset rebuilds descending', () => {
+  const sizes = [4, 2, 1, 3, 5].map(size => size * MIB);
+  const initial = createInitialState({ mode: MemoryMode.STATIC_UNEQUAL }, getDefaultPrograms());
+  let cursor = initial.config.osBytes;
+  const partitions = initial.partitions.map((part, index) => {
+    const result = { ...part, start: cursor, sizeBytes: sizes[index], end: cursor + sizes[index] - 1 };
+    cursor = result.end + 1;
+    return result;
+  });
+  const legacy = {
+    ...initial, config: { ...initial.config, unequalPartitionSizes: sizes }, partitions,
+    blocks: [initial.blocks[0], ...partitions.map((part, index) => ({ ...initial.blocks[index + 1], start: part.start, end: part.end, sizeBytes: part.sizeBytes }))]
+  };
+  assertState(legacy);
+  const resident = allocate(legacy, 'P1').state;
+  const restored = importScenario(exportScenario(resident));
+  assert.deepEqual(restored.config.unequalPartitionSizes, sizes);
+  assert.deepEqual(restored.partitions, resident.partitions);
+  assert.deepEqual(restored.blocks, resident.blocks);
+  assert.equal(restored.programs[0].start, resident.programs[0].start);
+  for (const type of ['RESET', 'START_SIMULATION']) {
+    const result = reduceCommand(restored, { type });
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.state.partitions.map(p => p.sizeBytes), [5, 4, 3, 2, 1].map(size => size * MIB));
+    assertState(result.state);
+  }
 });
 
 test('Persistence: rejects unknown schemas and corrupt memory coverage', () => {
