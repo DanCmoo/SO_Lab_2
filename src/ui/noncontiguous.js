@@ -2,10 +2,12 @@ import { toHexAddress, formatBytes } from '../domain/address.js';
 import { parseAddressInput, translateAddress } from '../domain/translation.js';
 import { deriveMetrics } from '../domain/metrics.js';
 import { elements } from './elements.js';
+import { getPageDetails } from '../domain/page-details.js';
 
 const $ = id => document.getElementById(id);
 let store, rangeStart = 0, tableStart = 0, previousMode = null, previousInstance = null, previousSelection = null;
 let committedTrace, traceConfig;
+let previousLayout = null;
 const cell = (tag, text) => { const element = document.createElement(tag); element.textContent = text; return element; };
 const isNew = state => ['SEGMENTATION', 'PAGING'].includes(state.config.mode);
 
@@ -57,13 +59,15 @@ export function initNoncontiguousUI(activeStore) {
       if (number >= store.getState().frames.length) throw new Error('Número de marco fuera del rango físico.');
       rangeStart = Math.floor(number / 256) * 256;
       selectBlock(`FRAME-${number}`);
-    } catch (error) { $('translation-result').textContent = error.message; }
+      $('frame-search-result').textContent = `Marco ${number} localizado.`;
+    } catch (error) { $('frame-search-result').textContent = error.message; }
   });
   for (const [id, delta] of [['btn-frame-prev', -256], ['btn-frame-next', 256]]) {
     $(id).addEventListener('click', () => {
       const state = store.getState();
       rangeStart = Math.max(0, Math.min(Math.floor((state.frames.length - 1) / 256) * 256, rangeStart + delta));
       selectBlock(`FRAME-${rangeStart}`);
+      $('frame-search-result').textContent = '';
     });
   }
   for (const [id, delta] of [['btn-table-prev', -64], ['btn-table-next', 64]]) {
@@ -101,9 +105,12 @@ export function renderNoncontiguousTools(state) {
   $('noncontiguous-tools').hidden = !enabled;
   $('frame-controls').hidden = !paged;
   elements.btnUndo.disabled = !store.canUndo();
-  if (previousMode !== state.config.mode) {
+  const layout = `${state.config.mode}:${state.config.osBytes}:${state.config.pageSizeBytes}`;
+  if (previousMode !== state.config.mode || previousLayout !== layout) {
+    previousLayout = layout;
     previousMode = state.config.mode; rangeStart = 0; tableStart = 0;
-    previousInstance = null; $('translation-result').textContent = '';
+    previousInstance = null; previousSelection = null; $('translation-result').textContent = '';
+    $('frame-search-result').textContent = '';
   }
   if (!enabled) { $('metric-mode-summary').textContent = ''; return; }
   const metrics = deriveMetrics(state);
@@ -139,7 +146,13 @@ export function renderNoncontiguousTools(state) {
     const td = document.createElement('td'), button = cell('button', 'Ver'); button.type = 'button';
     button.setAttribute('aria-label', paged ? `Localizar página ${entry.pageNumber} en marco ${entry.frameNumber}` : `Localizar segmento ${entry.segmentNumber}`);
     button.addEventListener('click', () => {
-      if (paged) { rangeStart = Math.floor(entry.frameNumber / 256) * 256; $('translate-page').value = entry.pageNumber; }
+      if (paged) {
+        rangeStart = Math.floor(entry.frameNumber / 256) * 256;
+        $('translate-page').value = entry.pageNumber;
+        $('translate-logical').value = entry.pageNumber * state.config.pageSizeBytes;
+        $('translate-offset').value = '0';
+        $('translation-result').textContent = '';
+      }
       else $('translate-segment').value = entry.segmentNumber;
       selectBlock(paged ? `FRAME-${entry.frameNumber}` : `SEG-${entry.regionId}`);
     });
@@ -160,6 +173,11 @@ export function renderNoncontiguousTools(state) {
   const details = selectedFrame ? `Marco ${selectedFrame.frameNumber} · ${selectedFrame.ownerKind} · ${selectedFrame.programId || 'Sin proceso'} · ${toHexAddress(selectedFrame.frameNumber * state.config.pageSizeBytes)} — ${toHexAddress((selectedFrame.frameNumber + 1) * state.config.pageSizeBytes - 1)}`
     : block ? `${block.kind} · ${block.programId || 'Sin proceso'} · ${toHexAddress(block.start)} — ${toHexAddress(block.end)} · ${formatBytes(block.sizeBytes)}` : 'Selecciona un segmento o marco para inspeccionarlo.';
   elements.inspectorContent.textContent = details;
+  if (selectedFrame?.ownerKind === 'PAGE') {
+    const ownerProgram = residents.find(p => p.id === selectedFrame.programId);
+    const page = ownerProgram && getPageDetails(ownerProgram, selectedFrame.pageNumber, state.config.pageSizeBytes);
+    if (page) elements.inspectorContent.textContent += `\nProceso: ${ownerProgram.name} (${ownerProgram.id}) · Página lógica ${selectedFrame.pageNumber}\n${page.usedBytes} B útiles · ${page.paddingBytes} B de relleno\nRango lógico: ${toHexAddress(page.logicalStart)} — ${toHexAddress(page.logicalEnd)}\nRegiones: ${page.regions.map(region => `${region.name}: ${region.bytes} B (${toHexAddress(region.start)} — ${toHexAddress(region.end)})`).join('; ')}`;
+  }
 }
 
 export function renderNoncontiguousMap(state, onSelect) {
@@ -168,8 +186,10 @@ export function renderNoncontiguousMap(state, onSelect) {
   const canvas = document.createElement('canvas'); canvas.width = 32; canvas.height = 600; canvas.style.width = '100%'; canvas.style.height = '100%';
   canvas.setAttribute('role', 'img'); canvas.setAttribute('aria-label', 'Vista global proporcional de los 16 MiB');
   const ctx = canvas.getContext('2d');
+  const rootStyle = getComputedStyle(document.documentElement);
+  const programColors = new Map(state.programs.map(program => [program.id, (program.colorToken || '#708e78').replace(/var\((--[\w-]+)\)/g, (_, token) => rootStyle.getPropertyValue(token).trim())]));
   for (const block of state.blocks) {
-    ctx.fillStyle = block.kind === 'OS' ? '#626878' : block.kind === 'HOLE' ? '#283332' : '#708e78';
+    ctx.fillStyle = block.kind === 'OS' ? '#626878' : block.kind === 'HOLE' ? '#283332' : programColors.get(block.programId) || '#708e78';
     ctx.fillRect(0, block.start / state.config.totalBytes * 600, 32, block.sizeBytes / state.config.totalBytes * 600);
   }
   elements.proportionalRail.replaceChildren(canvas);
@@ -180,11 +200,12 @@ export function renderNoncontiguousMap(state, onSelect) {
     const button = cell('button', ''); button.type = 'button';
     const program = state.programs.find(p => p.id === entry.programId);
     const id = paged ? `FRAME-${entry.frameNumber}` : entry.id;
-    const label = paged ? `Marco ${entry.frameNumber} · ${entry.ownerKind}${program ? ` · ${program.name} · página ${entry.pageNumber}` : ''}`
+    const label = paged ? `Marco ${entry.frameNumber} · ${entry.ownerKind}${program ? ` · ${program.id} · ${program.name} · página ${entry.pageNumber}` : ''}`
       : entry.kind === 'SEGMENT' ? `${program?.name} · ${program?.segmentTable.find(d => d.regionId === entry.regionId)?.name}` : entry.kind === 'OS' ? 'Sistema operativo' : 'Hueco libre';
     button.className = paged ? `frame-cell owner-${entry.ownerKind.toLowerCase()}` : `memory-block-card kind-${entry.kind.toLowerCase()}`;
     if (state.selectedId === id) button.classList.add('selected');
-    button.textContent = paged ? `${entry.frameNumber}${entry.ownerKind === 'PAGE' ? ` · p${entry.pageNumber}` : ` · ${entry.ownerKind}`}` : `${label} · ${formatBytes(entry.sizeBytes)} · ${toHexAddress(entry.start)} — ${toHexAddress(entry.end)}`;
+    if (program) button.style.setProperty('--prog-color', program.colorToken);
+    button.textContent = paged ? `${entry.frameNumber}${entry.ownerKind === 'PAGE' ? ` · ${entry.programId} · p${entry.pageNumber}` : ` · ${entry.ownerKind}`}` : `${label} · ${formatBytes(entry.sizeBytes)} · ${toHexAddress(entry.start)} — ${toHexAddress(entry.end)}`;
     button.title = label;
     button.setAttribute('aria-label', label);
     button.addEventListener('click', () => onSelect(id)); fragment.appendChild(button);

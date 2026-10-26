@@ -62,6 +62,10 @@ export function recalculateConfigValues() {
   try {
     osBytes = osRaw.trim() !== '' && Number(osRaw) === 0 ? 0 : parseUnitToBytes(osRaw, osUnit);
   } catch (_e) {
+    if (elements.selectMode.value === MemoryMode.PAGING) {
+      elements.modeHelp.textContent = 'Reserva del SO inválida: introduce un tamaño en bytes enteros, desde 0 y menor que 16 MiB.';
+      return;
+    }
     // Usa el valor predeterminado si la entrada no es válida.
   }
 
@@ -69,6 +73,14 @@ export function recalculateConfigValues() {
   const mode = elements.selectMode.value;
   if (mode === MemoryMode.PAGING) {
     const Q = Number(elements.selectPageSize.value);
+    if (osBytes < 0 || osBytes >= TOTAL_MEMORY_BYTES) {
+      elements.modeHelp.textContent = 'Reserva del SO inválida: debe ser desde 0 y menor que 16 MiB.';
+      return;
+    }
+    if (osBytes % Q !== 0) {
+      elements.modeHelp.textContent = `Configuración inválida: la reserva del SO debe ser múltiplo del tamaño de página (${formatBytes(Q)}). El mapa conserva la última configuración aplicada.`;
+      return;
+    }
     elements.modeHelp.textContent = `RAM: 16 MiB · SO: ${formatBytes(osBytes)} · Usuario: ${formatBytes(userBytes)} · ${TOTAL_MEMORY_BYTES / Q} marcos totales · ${osBytes / Q} del SO. Marcos libres en orden ascendente: todos tienen igual capacidad; los ajustes no aplican. Carga completa de un nivel, sin TLB, demanda, reemplazo ni crecimiento. Tablas como metadatos sin coste adicional simulado.`;
   }
   if (mode === MemoryMode.SEGMENTATION) elements.modeHelp.textContent = `RAM: 16 MiB · SO: ${formatBytes(osBytes)} · Usuario: ${formatBytes(userBytes)}. Cada región tiene base, límite y permisos. Carga completa, sin compactación, crecimiento ni memoria compartida. La pila usa base inferior y desplazamientos crecientes. Tablas como metadatos sin coste adicional simulado.`;

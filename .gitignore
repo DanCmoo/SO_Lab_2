@@ -1,0 +1,20 @@
+# Entregas generadas, informes y archivos temporales locales.
+/output/
+/tmp/
+*.log
+
+# Archivos ajenos al simulador.
+/probando
+/probando.html
+
+# Planificacion y notas internas de las sesiones de desarrollo.
+/specs/plan-implementacion-segmentacion-paginacion.md
+/specs/resultados-pruebas-navegador-2026-10-21.md
+
+# Dependencias, caches y archivos del sistema operativo.
+node_modules/
+__pycache__/
+*.py[cod]
+.DS_Store
+Thumbs.db
+Desktop.ini

@@ -531,13 +531,15 @@ select option { color: var(--color-text); background: var(--color-surface); }
 .frame-controls input { width: 90px; }
 .frame-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 4px; align-content: start; }
 .frame-cell { font: 10px var(--font-mono); min-height: 30px; padding: 4px; overflow-wrap: anywhere; }
-.owner-os { background: #424958; }.owner-page { border-color: #759b83; }.owner-free { color: var(--color-muted); }
+.owner-os { background: #424958; }.owner-page { border-color: var(--prog-color); color: var(--prog-color); background: color-mix(in srgb, var(--prog-color) 13%, var(--color-bg)); }.owner-free { color: var(--color-muted); }
 .frame-cell.selected, .kind-segment.selected { outline: 2px solid var(--color-primary); outline-offset: -2px; }
 .kind-segment { border-left: 4px solid #759b83; text-align: left; font-size: 12px; }
 .table-scroll { max-height: 260px; overflow: auto; }
 #noncontiguous-tools { font-size: 12px; gap: 8px; }
 #noncontiguous-tools input, #noncontiguous-tools select { width: 100%; margin: 4px 0; }
 #translation-result { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
+#frame-search-result { flex-basis: 100%; overflow-wrap: anywhere; }
+#inspector-content { white-space: pre-wrap; overflow-wrap: anywhere; }
 #trace-content { font-size: 10px; max-height: 180px; overflow: auto; white-space: pre-wrap; }
 .segment-row { flex-wrap: wrap; }.segment-permissions { display: flex; gap: 8px; }.segment-permissions label { display: flex; align-items: center; gap: 3px; font-size: 11px; }
 .segment-permissions input { width: auto; }

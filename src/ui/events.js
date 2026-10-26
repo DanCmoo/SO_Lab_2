@@ -155,7 +155,12 @@ export function initEvents(store) {
     recalculateConfigValues();
     if (store.getState().phase === 'RUNNING') {
       try { pendingResetConfig = readConfigFromForm(); openModal(elements.dialogConfirmReset); }
-      catch (error) { renderApp(store.getState(), store); setStatusBanner({ type: 'error', message: describeError(error) }); }
+      catch (error) { renderApp(store.getState(), store, { resetConfigInputs: true }); setStatusBanner({ type: 'error', message: describeError(error) }); }
+    } else {
+      try {
+        const result = store.dispatch({ type: 'RESET', config: readConfigFromForm() });
+        if (!result.ok) setStatusBanner({ type: 'error', message: describeError(result) });
+      } catch (error) { setStatusBanner({ type: 'error', message: describeError(error) }); }
     }
   });
   elements.btnUndo.addEventListener('click', () => {
@@ -355,12 +360,12 @@ export function initEvents(store) {
       if (dialog) closeModal(dialog);
       if (dialog === elements.dialogConfirmReset) {
         pendingResetConfig = null;
-        renderApp(store.getState(), store);
+        renderApp(store.getState(), store, { resetConfigInputs: true });
       }
     });
   });
   elements.dialogConfirmReset.addEventListener('cancel', () => {
     pendingResetConfig = null;
-    renderApp(store.getState(), store);
+    renderApp(store.getState(), store, { resetConfigInputs: true });
   });
 }

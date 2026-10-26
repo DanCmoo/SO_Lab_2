@@ -58,6 +58,8 @@ El selector incluye seis modos. **Segmentación** asigna Code, Data y las reserv
 
 En **Tablas y traducción de direcciones**, selecciona una instancia. Puedes localizar su segmento/marco desde la tabla o introducir una dirección lógica lineal, o un par página/desplazamiento. El resultado muestra la fórmula y resalta la asignación física. El relleno de la última página se cuenta como fragmentación interna y no es una dirección lógica válida. Los errores no terminan procesos ni consumen deshacer.
 
+El tamaño de página actualiza el mapa durante la configuración. Las reservas del SO conservan la unidad elegida y se advierte si no están alineadas al tamaño de página. El inspector de marcos muestra propietario, página lógica, bytes útiles, relleno y las regiones que intersectan la página. La cuadrícula identifica cada instancia y utiliza los colores del catálogo; **Ver** prepara también la dirección lineal de la página. Los mensajes de búsqueda de marcos aparecen junto al control de búsqueda.
+
 El mapa paginado muestra hasta 256 marcos por vista y las tablas hasta 64 filas. Usa **Ir al marco**, los controles de navegación o **Ver** en una fila para localizar cualquier marco, incluso con páginas de 1 KiB. El carril global mantiene la escala proporcional. Las instancias no contiguas muestran cantidades de segmentos/páginas, sin inventar un rango físico único.
 
 **Deshacer** restaura la instancia y sus tablas/marcos en una sola operación. Cambiar de modo o aplicar una configuración durante la ejecución requiere confirmar reinicio; cancelar conserva la sesión. La persistencia usa esquema 3 y migra versiones 1 y 2 con la misma clave de almacenamiento. Una sesión incompatible se conserva hasta que elijas empezar de nuevo.

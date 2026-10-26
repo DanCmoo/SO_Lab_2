@@ -9,13 +9,15 @@ import { renderProgramLists } from './program-list.js';
 import { renderNoncontiguousTools, renderAttemptTrace, syncCommittedTrace } from './noncontiguous.js';
 import { escapeHTML } from './safe-html.js';
 
+let renderedConfig = null;
+
 /**
  * Coordinador principal que proyecta el estado de la simulación en el DOM.
  *
  * @param {import('../domain/constants.js').SimulationState} state
  * @param {Object} store
  */
-export function renderApp(state, store) {
+export function renderApp(state, store, { resetConfigInputs = false } = {}) {
   const { config, phase, programs, blocks, selectedId } = state;
   const isRunning = phase === 'RUNNING';
 
@@ -26,9 +28,9 @@ export function renderApp(state, store) {
   if (elements.selectAlgorithm.value !== config.algorithm) {
     elements.selectAlgorithm.value = config.algorithm;
   }
-  if (Number(elements.inputOsSize.value) * MIB !== config.osBytes || elements.selectOsUnit.value !== 'MiB') {
-    elements.inputOsSize.value = config.osBytes / MIB;
-    elements.selectOsUnit.value = 'MiB';
+  if (resetConfigInputs || renderedConfig?.osBytes !== config.osBytes) {
+    const unitBytes = { B: 1, KiB: 1024, MiB: MIB }[elements.selectOsUnit.value];
+    elements.inputOsSize.value = config.osBytes / unitBytes;
   }
   if (config.mode === MemoryMode.STATIC_EQUAL) {
     const unitBytes = { B: 1, KiB: 1024, MiB: MIB }[elements.selectEqualUnit.value];
@@ -39,7 +41,8 @@ export function renderApp(state, store) {
   if (config.mode === MemoryMode.STATIC_UNEQUAL) {
     elements.inputUnequalSizes.value = config.unequalPartitionSizes.map(size => size / MIB).join(', ');
   }
-  if (config.mode === MemoryMode.PAGING) elements.selectPageSize.value = config.pageSizeBytes;
+  if (config.mode === MemoryMode.PAGING && (resetConfigInputs || renderedConfig?.pageSizeBytes !== config.pageSizeBytes)) elements.selectPageSize.value = config.pageSizeBytes;
+  renderedConfig = { ...config };
 
   if (isRunning) {
     elements.btnStartSim.textContent = 'En ejecución';
